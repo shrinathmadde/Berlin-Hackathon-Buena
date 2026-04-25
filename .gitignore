@@ -15,6 +15,10 @@ __pycache__/
 context-engine-console/node_modules/
 context-engine-console/dist/
 context-engine-console/.vite/
-context-engine-console/node_modules/
-context-engine-console/dist/
-context-engine-console/.vite/
+
+# Test artifacts
+test/results/
+scan_state.json
+
+# Secrets
+.env

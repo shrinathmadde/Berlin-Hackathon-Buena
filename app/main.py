@@ -1,5 +1,10 @@
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+
+# Load .env before any module reads os.environ (factory caches LLM_*).
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,7 +20,7 @@ from app.models import (
     Tenant,
     Unit,
 )
-from app.routers import context, facts, llm
+from app.routers import context, facts, llm, scan
 from app.routers.crud import make_router
 
 
@@ -59,6 +64,9 @@ app.include_router(context.router)
 
 # LLM endpoint consumed by the frontend (placeholder for now).
 app.include_router(llm.router)
+
+# Server-side data-folder scan that diffs mtimes and routes new files through the LLM.
+app.include_router(scan.router)
 
 
 @app.get("/health", tags=["meta"])
