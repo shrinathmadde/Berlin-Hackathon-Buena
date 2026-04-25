@@ -164,6 +164,9 @@ def main() -> int:
                 f"=== mode   : {body.get('mode', args.mode)}\n"
                 f"=== latency: {llm_ms:.1f} ms\n"
                 f"=== chars  : {len(text)} sent / {len(response)} returned\n\n"
+                f"--- INPUT (text sent to LLM, possibly truncated to {MAX_CHARS} chars) ---\n"
+                f"{text}\n\n"
+                f"--- OUTPUT (LLM response) ---\n"
                 f"{response}\n"
             )
 
