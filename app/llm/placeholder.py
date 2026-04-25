@@ -1,6 +1,8 @@
 """Placeholder provider — used when no real LLM is configured."""
 from __future__ import annotations
 
+import uuid
+
 from app.llm.base import LLMProvider
 
 
@@ -8,6 +10,13 @@ def _is_sql_prompt(system: str | None) -> bool:
     return bool(
         system
         and "translate natural-language requests into sqlite sql" in system.lower()
+    )
+
+
+def _is_document_prompt(system: str | None) -> bool:
+    return bool(
+        system
+        and "extract structured records from one german property-management document" in system.lower()
     )
 
 
@@ -38,6 +47,28 @@ def _placeholder_sql(prompt: str) -> str:
     return "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;"
 
 
+def _placeholder_document_sql(prompt: str) -> str:
+    prompt_lower = prompt.lower()
+    if "rechnung" in prompt_lower or "invoice" in prompt_lower:
+        return (
+            '{'
+            '"summary":"placeholder invoice extraction",'
+            '"records":['
+            '{"table":"invoices","record":{"invoice_id":"INV-' + uuid.uuid4().hex[:8] + '","property_id":"LIE-001","provider_company":"PLACEHOLDER PROVIDER","invoice_date":"2026-01-01","recipient":"placeholder"}},'
+            '{"table":"source_events","record":{"event_id":"NOTE-' + uuid.uuid4().hex[:8] + '","source_type":"pdf_invoice","property_id":"LIE-001","raw_content":"placeholder document"}}'
+            "]}"
+        )
+
+    return (
+        '{'
+        '"summary":"placeholder communication extraction",'
+        '"records":['
+        '{"table":"source_events","record":{"event_id":"NOTE-' + uuid.uuid4().hex[:8] + '","source_type":"note","property_id":"LIE-001","raw_content":"placeholder document"}},'
+        '{"table":"facts","record":{"fact_id":"FACT-' + uuid.uuid4().hex[:8] + '","property_id":"LIE-001","entity_type":"property","entity_id":"LIE-001","category":"note","statement":"placeholder extracted fact","status":"active"}}'
+        "]}"
+    )
+
+
 class PlaceholderProvider(LLMProvider):
     @property
     def model_name(self) -> str:
@@ -57,6 +88,9 @@ class PlaceholderProvider(LLMProvider):
 
         if _is_sql_prompt(system):
             return _placeholder_sql(prompt)
+
+        if _is_document_prompt(system):
+            return _placeholder_document_sql(prompt)
 
         return (
             "[PLACEHOLDER LLM RESPONSE]\n"

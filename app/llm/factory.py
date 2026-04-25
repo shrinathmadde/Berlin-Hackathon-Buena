@@ -56,7 +56,7 @@ def get_llm_provider() -> LLMProvider:
         # Google's Gemini API exposes an OpenAI-compatible endpoint, so we reuse
         # the same provider — only the base URL and default model change.
         api_key = _env("LLM_API_KEY")
-        model = _env("LLM_MODEL", "gemini-2.0-flash")
+        model = _env("LLM_MODEL", "gemini-2.5-flash-lite")
         base_url = _env(
             "LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai"
         )
@@ -65,7 +65,7 @@ def get_llm_provider() -> LLMProvider:
         return OpenAICompatibleProvider(
             api_key=api_key,
             base_url=base_url or "https://generativelanguage.googleapis.com/v1beta/openai",
-            model=model or "gemini-2.0-flash",
+            model=model or "gemini-2.5-flash-lite",
         )
 
     if provider == "anthropic":

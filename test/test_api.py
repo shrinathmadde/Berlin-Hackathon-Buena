@@ -51,14 +51,55 @@ def random_supported_file(folder: Path, rng: random.Random) -> Path | None:
     return rng.choice(candidates)
 
 
-def sample_one_per_folder(root: Path, rng: random.Random) -> list[Path]:
+def random_supported_file_recursive(folder: Path, rng: random.Random) -> Path | None:
+    candidates = sorted(
+        path
+        for path in folder.rglob("*")
+        if path.is_file()
+        and not path.name.startswith(".")
+        and path.suffix.lower() in SUPPORTED
+    )
+    if not candidates:
+        return None
+    return rng.choice(candidates)
+
+
+def sample_one_per_folder(
+    root: Path,
+    rng: random.Random,
+    *,
+    include_root: bool = True,
+    recursive: bool = True,
+    exclude_dirs: set[str] | None = None,
+    child_folder_recursive_pick: bool = False,
+) -> list[Path]:
+    exclude_dirs = exclude_dirs or set()
     picks: list[Path] = []
-    if root.is_dir():
+    if root.is_dir() and include_root and root.name not in exclude_dirs:
         root_pick = random_supported_file(root, rng)
         if root_pick is not None:
             picks.append(root_pick)
-    for folder in sorted(path for path in root.rglob("*") if path.is_dir() and not path.name.startswith(".")):
-        pick = random_supported_file(folder, rng)
+
+    if recursive:
+        folders = sorted(
+            path
+            for path in root.rglob("*")
+            if path.is_dir()
+            and not path.name.startswith(".")
+            and path.name not in exclude_dirs
+        )
+    else:
+        folders = sorted(
+            path
+            for path in root.iterdir()
+            if path.is_dir()
+            and not path.name.startswith(".")
+            and path.name not in exclude_dirs
+        )
+
+    for folder in folders:
+        picker = random_supported_file_recursive if child_folder_recursive_pick else random_supported_file
+        pick = picker(folder, rng)
         if pick is not None:
             picks.append(pick)
     return picks
@@ -83,29 +124,18 @@ def safe_filename(rel_path: Path) -> str:
     return str(rel_path).replace("/", "__").replace("\\", "__")
 
 
-def build_question(rel_path: Path, text: str) -> str:
-    return (
-        "Read the following document and generate the exact SQL statement that should be "
-        "executed to store the most important structured information from it in the database. "
-        "Return executable SQL only.\n\n"
-        f"Document path: {rel_path}\n"
-        "Document text:\n"
-        f"\"\"\"\n{text}\n\"\"\""
-    )
-
-
-def _post_with_http(base_url: str, question: str, timeout: float) -> tuple[int, str]:
+def _post_with_http(base_url: str, payload: dict[str, object], timeout: float) -> tuple[int, str]:
     with httpx.Client(timeout=timeout) as client:
         client.get(f"{base_url}/health").raise_for_status()
-        response = client.post(f"{base_url}/api/sql", json={"question": question})
+        response = client.post(f"{base_url}/api/sql", json=payload)
         return response.status_code, response.text
 
 
-def _post_in_process(question: str) -> tuple[int, str]:
+def _post_in_process(question: dict[str, str]) -> tuple[int, str]:
     from app.main import app
 
     with TestClient(app) as client:
-        response = client.post("/api/sql", json={"question": question})
+        response = client.post("/api/sql", json=question)
         return response.status_code, response.text
 
 
@@ -123,6 +153,27 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=0, help="Stop after N sampled files (0 = no cap)")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducible sampling")
     parser.add_argument(
+        "--exclude-dir",
+        action="append",
+        default=[],
+        help="Directory name to exclude from folder sampling. Repeat to exclude more than one.",
+    )
+    parser.add_argument(
+        "--immediate-subdirs-only",
+        action="store_true",
+        help="Only sample immediate child folders of --data instead of walking recursively.",
+    )
+    parser.add_argument(
+        "--skip-root",
+        action="store_true",
+        help="Do not sample a file directly from the --data folder itself.",
+    )
+    parser.add_argument(
+        "--child-folder-recursive-pick",
+        action="store_true",
+        help="When sampling folders, choose one file from anywhere in each folder's subtree.",
+    )
+    parser.add_argument(
         "--max-chars",
         type=int,
         default=MAX_CHARS,
@@ -138,7 +189,14 @@ def main() -> int:
 
     seed = args.seed if args.seed is not None else random.SystemRandom().randrange(1, 10**9)
     rng = random.Random(seed)
-    files = sample_one_per_folder(data_dir, rng)
+    files = sample_one_per_folder(
+        data_dir,
+        rng,
+        include_root=not args.skip_root,
+        recursive=not args.immediate_subdirs_only,
+        exclude_dirs=set(args.exclude_dir),
+        child_folder_recursive_pick=args.child_folder_recursive_pick,
+    )
     if args.limit > 0:
         files = files[: args.limit]
     if not files:
@@ -162,13 +220,17 @@ def main() -> int:
             (run_dir / f"{safe_filename(rel)}.error.txt").write_text(extraction_error)
             continue
 
-        question = build_question(rel, text)
+        request_payload = {
+            "mode": "document_extract",
+            "text": text,
+            "document_path": str(rel),
+        }
         t0 = time.perf_counter()
         try:
             if args.base:
-                status_code, body_text = _post_with_http(args.base, question, args.timeout)
+                status_code, body_text = _post_with_http(args.base, request_payload, args.timeout)
             else:
-                status_code, body_text = _post_in_process(question)
+                status_code, body_text = _post_in_process(request_payload)
             elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
         except Exception as e:  # noqa: BLE001
             err_msg = f"{type(e).__name__}: {e}"
@@ -196,7 +258,7 @@ def main() -> int:
                 f"=== source : {rel}\n"
                 f"=== status : {status_code}\n"
                 f"=== latency: {elapsed_ms:.2f} ms\n\n"
-                f"--- QUESTION ---\n{question}\n\n"
+                f"--- REQUEST ---\n{json.dumps(request_payload, indent=2)}\n\n"
                 f"--- INPUT TEXT ---\n{text}\n\n"
                 f"--- ERROR ---\n{json.dumps(parsed_body, indent=2) if not isinstance(parsed_body, str) else parsed_body}\n"
             )
@@ -207,8 +269,8 @@ def main() -> int:
         record["response"] = parsed_body
         if isinstance(parsed_body, dict):
             record["model"] = parsed_body.get("model", "?")
-            record["sql"] = parsed_body.get("sql", "")
             record["row_count"] = parsed_body.get("row_count", 0)
+            record["write_count"] = len(parsed_body.get("writes", []))
         manifest.append(record)
 
         pretty_body = json.dumps(parsed_body, indent=2) if not isinstance(parsed_body, str) else parsed_body
@@ -216,7 +278,7 @@ def main() -> int:
             f"=== source : {rel}\n"
             f"=== status : {status_code}\n"
             f"=== latency: {elapsed_ms:.2f} ms\n\n"
-            f"--- QUESTION ---\n{question}\n\n"
+            f"--- REQUEST ---\n{json.dumps(request_payload, indent=2)}\n\n"
             f"--- INPUT TEXT ---\n{text}\n\n"
             f"--- API OUTPUT ---\n{pretty_body}\n"
         )

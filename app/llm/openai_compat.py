@@ -41,6 +41,15 @@ class OpenAICompatibleProvider(LLMProvider):
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
+        payload = {
+            "model": self._model,
+            "messages": messages,
+        }
+        if self._model.startswith("gpt-5"):
+            payload["max_completion_tokens"] = max_tokens
+        else:
+            payload["max_tokens"] = max_tokens
+            payload["temperature"] = temperature
         try:
             with httpx.Client(timeout=self._timeout) as client:
                 r = client.post(
@@ -49,12 +58,7 @@ class OpenAICompatibleProvider(LLMProvider):
                         "Authorization": f"Bearer {self._api_key}",
                         "Content-Type": "application/json",
                     },
-                    json={
-                        "model": self._model,
-                        "messages": messages,
-                        "max_tokens": max_tokens,
-                        "temperature": temperature,
-                    },
+                    json=payload,
                 )
             if r.status_code >= 400:
                 raise LLMError(f"{r.status_code}: {r.text[:500]}")
