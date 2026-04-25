@@ -412,6 +412,44 @@ Jan 2024                                        Jan 2026
 
 ---
 
+## Tables and Relations — Summary
+
+All 10 tables at a glance, with the foreign keys that wire them together.
+
+| Table | PK | Foreign keys (column → target) |
+|---|---|---|
+| `properties` | `property_id` | — (root entity) |
+| `buildings` | `building_id` | `property_id` → `properties.property_id` |
+| `units` | `unit_id` | `building_id` → `buildings.building_id`, `property_id` → `properties.property_id`, `owner_id` → `owners.owner_id` |
+| `owners` | `owner_id` | — |
+| `tenants` | `tenant_id` | `unit_id` → `units.unit_id`, `landlord_owner_id` → `owners.owner_id` |
+| `service_providers` | `provider_id` | — |
+| `bank_transactions` | `transaction_id` | `property_id` → `properties.property_id` |
+| `invoices` | `invoice_id` | `provider_id` → `service_providers.provider_id`, `property_id` → `properties.property_id`, `paid_transaction_id` → `bank_transactions.transaction_id`, `source_event_id` → `source_events.event_id` |
+| `source_events` | `event_id` | `property_id` → `properties.property_id` |
+| `facts` | `fact_id` | `property_id` → `properties.property_id`, `source_event_id` → `source_events.event_id`, `superseded_by` → `facts.fact_id` (self), plus soft-FK `(entity_type, entity_id)` to any structured table |
+
+**Relationship cardinalities:**
+
+- `properties` 1 ─< N `buildings` 1 ─< N `units`
+- `units` N >─ 1 `owners` (current owner; ownership history lives in `facts`)
+- `units` 1 ─< N `tenants` (current tenant has `lease_end IS NULL`)
+- `tenants` N >─ 1 `owners` (landlord)
+- `service_providers` 1 ─< N `invoices`
+- `bank_transactions` 1 ─< N `invoices` (one transaction can pay one invoice; nullable until matched)
+- `source_events` 1 ─< N `invoices` (the PDF that produced the invoice row)
+- `source_events` 1 ─< N `facts` (the email/PDF that produced the fact)
+- `facts` 1 ─< 1 `facts` (self-ref via `superseded_by`, forming the history chain)
+- `facts.(entity_type, entity_id)` — polymorphic soft-FK to `owners` / `tenants` / `units` / `buildings` / `service_providers` / `properties`
+
+**Reading the schema by purpose:**
+
+- **Static reference data** (rarely changes): `properties`, `buildings`, `units`, `owners`, `tenants`, `service_providers` — loaded from `data/hackathon/stammdaten/`.
+- **Append-only event streams**: `bank_transactions`, `invoices`, `source_events` — every new email, PDF, or transaction is one row, never updated in place.
+- **The flexible layer**: `facts` — the only table where the supersession chain (`status` + `superseded_by`) lives. This is where surgical updates happen.
+
+---
+
 ## Design Notes for the Challenge
 
 1. **Identity aliasing**: An owner appears as `eigentuemer` in `stammdaten.json`,
