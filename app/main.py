@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
 from app.models import (
@@ -14,7 +15,7 @@ from app.models import (
     Tenant,
     Unit,
 )
-from app.routers import context, facts
+from app.routers import context, facts, llm
 from app.routers.crud import make_router
 
 
@@ -32,6 +33,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Open CORS — the Lovable preview lives on a different origin and needs to call /api/llm.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # Plain CRUD for every structured entity.
 app.include_router(make_router(Property, "properties", "property_id", "properties"))
@@ -47,6 +56,9 @@ app.include_router(make_router(SourceEvent, "events", "event_id", "source_events
 # Custom routers for the flexible layer + aggregate context queries.
 app.include_router(facts.router)
 app.include_router(context.router)
+
+# LLM endpoint consumed by the frontend (placeholder for now).
+app.include_router(llm.router)
 
 
 @app.get("/health", tags=["meta"])
