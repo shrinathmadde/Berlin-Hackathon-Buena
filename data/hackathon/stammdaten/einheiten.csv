@@ -1,0 +1,53 @@
+id,haus_id,einheit_nr,lage,typ,wohnflaeche_qm,zimmer,miteigentumsanteil
+EH-001,HAUS-12,WE 01,1. OG links,Wohnung,103.0,4.0,241
+EH-002,HAUS-12,WE 02,1. OG mitte,Wohnung,49.0,1.5,114
+EH-003,HAUS-12,WE 03,1. OG rechts,Wohnung,62.0,2.0,144
+EH-004,HAUS-12,WE 04,2. OG links,Wohnung,60.0,2.0,139
+EH-005,HAUS-12,WE 05,2. OG mitte,Wohnung,110.0,4.0,255
+EH-006,HAUS-12,WE 06,2. OG rechts,Wohnung,51.0,1.5,118
+EH-007,HAUS-12,WE 07,3. OG links,Wohnung,45.0,1.5,104
+EH-008,HAUS-12,WE 08,3. OG mitte,Wohnung,48.0,1.5,111
+EH-009,HAUS-12,WE 09,3. OG rechts,Wohnung,67.0,2.0,156
+EH-010,HAUS-12,WE 10,4. OG links,Wohnung,92.0,3.5,214
+EH-011,HAUS-12,WE 11,4. OG mitte,Wohnung,95.0,3.5,221
+EH-012,HAUS-12,WE 12,4. OG rechts,Wohnung,110.0,4.0,255
+EH-013,HAUS-12,WE 13,5. OG links,Wohnung,84.0,3.0,195
+EH-014,HAUS-12,WE 14,5. OG mitte,Wohnung,85.0,3.0,197
+EH-015,HAUS-12,WE 15,5. OG rechts,Wohnung,115.0,4.5,267
+EH-016,HAUS-12,WE 16,5. OG links,Wohnung,108.0,4.0,251
+EH-017,HAUS-12,WE 17,5. OG rechts,Wohnung,72.0,2.5,167
+EH-018,HAUS-12,TG 18,Tiefgarage,Tiefgarage,12.5,0.0,23
+EH-019,HAUS-14,WE 19,1. OG links,Wohnung,64.0,2.0,149
+EH-020,HAUS-14,WE 20,1. OG mitte,Wohnung,46.0,1.5,107
+EH-021,HAUS-14,WE 21,1. OG rechts,Wohnung,82.0,3.0,190
+EH-022,HAUS-14,WE 22,2. OG links,Wohnung,75.0,2.5,174
+EH-023,HAUS-14,WE 23,2. OG mitte,Wohnung,96.0,3.5,223
+EH-024,HAUS-14,WE 24,2. OG rechts,Wohnung,115.0,4.5,267
+EH-025,HAUS-14,WE 25,3. OG links,Wohnung,109.0,4.0,253
+EH-026,HAUS-14,WE 26,3. OG mitte,Wohnung,93.0,3.5,216
+EH-027,HAUS-14,WE 27,3. OG rechts,Wohnung,82.0,3.0,190
+EH-028,HAUS-14,WE 28,4. OG links,Wohnung,96.0,3.5,223
+EH-029,HAUS-14,WE 29,4. OG mitte,Wohnung,120.0,4.5,279
+EH-030,HAUS-14,WE 30,4. OG rechts,Wohnung,95.0,3.5,221
+EH-031,HAUS-14,WE 31,5. OG links,Wohnung,103.0,4.0,239
+EH-032,HAUS-14,WE 32,5. OG mitte,Wohnung,48.0,1.5,111
+EH-033,HAUS-14,WE 33,5. OG rechts,Wohnung,119.0,4.5,276
+EH-034,HAUS-14,WE 34,5. OG links,Wohnung,118.0,4.5,274
+EH-035,HAUS-14,WE 35,5. OG links,Wohnung,85.0,3.0,197
+EH-036,HAUS-14,WE 36,5. OG rechts,Wohnung,107.0,4.0,248
+EH-037,HAUS-14,GE 37,EG Ladenlokal,Gewerbe,142.0,0.0,348
+EH-038,HAUS-14,TG 38,Tiefgarage,Tiefgarage,12.5,0.0,23
+EH-039,HAUS-16,WE 39,1. OG links,Wohnung,64.0,2.0,149
+EH-040,HAUS-16,WE 40,1. OG mitte,Wohnung,73.0,2.5,169
+EH-041,HAUS-16,WE 41,1. OG rechts,Wohnung,106.0,4.0,246
+EH-042,HAUS-16,WE 42,2. OG links,Wohnung,103.0,4.0,239
+EH-043,HAUS-16,WE 43,2. OG mitte,Wohnung,94.0,3.5,218
+EH-044,HAUS-16,WE 44,2. OG rechts,Wohnung,95.0,3.5,221
+EH-045,HAUS-16,WE 45,3. OG links,Wohnung,66.0,2.0,153
+EH-046,HAUS-16,WE 46,3. OG mitte,Wohnung,85.0,3.0,197
+EH-047,HAUS-16,WE 47,3. OG rechts,Wohnung,110.0,4.0,255
+EH-048,HAUS-16,WE 48,4. OG links,Wohnung,64.0,2.0,149
+EH-049,HAUS-16,WE 49,4. OG mitte,Wohnung,115.0,4.5,267
+EH-050,HAUS-16,WE 50,4. OG rechts,Wohnung,59.0,2.0,137
+EH-051,HAUS-16,WE 51,4. OG rechts,Wohnung,85.0,3.0,197
+EH-052,HAUS-16,TG 52,Tiefgarage,Tiefgarage,12.5,0.0,23

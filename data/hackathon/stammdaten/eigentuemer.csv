@@ -1,0 +1,36 @@
+id,anrede,vorname,nachname,firma,strasse,plz,ort,land,email,telefon,iban,bic,einheit_ids,selbstnutzer,sev_mandat,beirat,sprache
+EIG-001,Herr,Marcus,Dowerg,,Ansgar-Davids-Platz 9890,43321,Saarbrücken,DE,marcus.dowerg@outlook.com,+49(0) 863794026,DE24100500002528809570,BYLADEM1001,EH-037;EH-032,False,True,False,de
+EIG-002,Frau,Gertraud,Holsten,,Beyerweg 78-21,35116,Kaiserslautern,DE,gertraud.holsten@gmail.com,04959 31034,DE43100700001171822782,GENODEF1P01,EH-047;EH-033,True,False,False,de
+EIG-003,Herr,Arnulf,Heintze,,Tintzmannweg 39,64752,Jülich,DE,arnulf.heintze@gmail.com,03276 48350,DE85100701245787133150,GENODEF1P01,EH-025;EH-049,False,True,False,de
+EIG-004,Herr,Erdal,Beckmann,,Seifertstraße 442,64139,Freudenstadt,DE,erdal.beckmann@gmx.de,08496 96532,DE83100100105183473829,DEUTDEBB101,EH-043;EH-015,True,False,True,de
+EIG-005,Frau,Josefine,Nohlmans,,Rädelring 1,01226,Kusel,DE,josefine.nohlmans@gmail.com,(08451) 46270,DE23100701246566701065,PBNKDEFFXXX,EH-007;EH-024,True,False,False,de
+EIG-006,Herr,Winfried,Ullmann,,Auguste-Wulff-Weg 9,82814,Döbeln,DE,winfried.ullmann@yahoo.de,07015430391,DE31120300003178108013,DEUTDEBB101,EH-027;EH-026,True,False,False,de
+EIG-007,Frau,Anni,Wagenknecht,,Suse-Reuter-Allee 8465,18227,Grimmen,DE,anni.wagenknecht@gmx.de,07133 15098,DE37100100106474687234,COBADEFFXXX,EH-048;EH-044,True,False,False,de
+EIG-008,Frau,Dunja,Schacht,,Karl-Heinrich-Staude-Straße 8829,01031,Hohenstein-Ernstthal,DE,dunja.schacht@gmx.de,+49(0) 763116566,DE96120300008820812191,HYVEDEMMXXX,EH-012;EH-028,True,False,False,de
+EIG-009,Herr,Horst,Vollbrecht,,Etzoldstraße 447,10651,Euskirchen,DE,horst.vollbrecht@gmx.de,+49(0)7810 801326,DE95100700009854353462,BELADEBEXXX,EH-002;EH-038,False,True,False,de
+EIG-010,Herr,Ingbert,Nerger,,Löchelweg 52-43,60260,Grimmen,DE,ingbert.nerger@gmx.de,+49(0)9805009788,DE46100100101838425135,PBNKDEFFXXX,EH-052;EH-050,False,False,True,de
+EIG-011,Frau,Caroline,Bohlander,,Elly-Butte-Straße 64/43,21913,Coburg,DE,caroline.bohlander@gmx.de,+49(0)6247 51079,DE36100701241241182449,BELADEBEXXX,EH-031;EH-035,False,False,False,de
+EIG-012,Frau,Kunigunda,Ditschlerin,,Hölzenbecherplatz 98-14,83842,Berlin,DE,kunigunda.ditschlerin@icloud.com,(08412) 41182,DE80100100101640052427,BELADEBEXXX,EH-005;EH-036,True,False,False,de
+EIG-013,Herr,Dominic,Jacobs,,48740 Cynthia Village Suite 005,10115,Berlin,US,dominic.jacobs@t-online.de,001-724-427-8680x11280,DE97100700008262045053,PBNKDEFFXXX,EH-023;EH-016,False,False,False,en
+EIG-014,Frau,Hulda,Eckbauer,,Zahnstr. 3-4,45053,Strasburg,DE,hulda.eckbauer@t-online.de,+49 (0) 2602 563421,DE58100500002602563421,HYVEDEMMXXX,EH-019;EH-009,False,True,False,de
+EIG-015,Firma,,,Kranz Vermoegensverwaltung,Gertrud-Gröttner-Straße 54/61,73375,Geithain,DE,kranz.vermoegensverwaltung@capital-partners.com,(08685) 01429,DE61100500003036541458,BELADEBEXXX,EH-011;EH-017,True,False,False,de
+EIG-016,Herr,Wolfgang,Hettner,,Rustplatz 1/7,19655,Schlüchtern,DE,wolfgang.hettner@web.de,+49(0)8835615951,DE24100700004019655698,DEUTDEBB101,EH-034;EH-010,False,True,False,de
+EIG-017,Herr,Osman,Jacob,,Steyweg 599,65648,Euskirchen,DE,osman.jacob@yahoo.de,0804436995,DE49100700003561595148,BELADEBEXXX,EH-001;EH-030,True,False,False,de
+EIG-018,Frau,Irmingard,Margraf,,Maria-Weitzel-Platz 4/4,38721,Osterburg,DE,irmingard.margraf@t-online.de,+49 (0) 0037 917693,DE36100701246299468044,DEUTDEBB101,EH-018,True,False,False,de
+EIG-019,Frau,Mina,Textor,,Magda-Textor-Weg 40-28,76320,Magdeburg,DE,mina.textor@icloud.com,02788 957986,DE38100700007214895134,HYVEDEMMXXX,EH-042,False,False,False,de
+EIG-020,Herr,Ronald,Kelley,,774 Mary Harbor,10115,Berlin,US,ronald.kelley@icloud.com,001-487-434-7143x45581,DE64120300006936763201,PBNKDEFFXXX,EH-045,False,False,True,en
+EIG-021,Frau,Dörte,Kraus,,Marlies-Linke-Straße 9,31665,Lübeck,DE,doerte.kraus@gmx.de,0705466889,DE64100100107278895798,HYVEDEMMXXX,EH-039,False,False,False,de
+EIG-022,Herr,Tom,Hartmann,,Melissa-Mosemann-Platz 6,34670,Husum,DE,tom.hartmann@icloud.com,(09016) 272046,DE52100701244873471434,BYLADEM1001,EH-029,False,False,False,de
+EIG-023,Herr,Gottlob,Hahn,,Karla-Reuter-Gasse 13/11,55646,Bogen,DE,gottlob.hahn@gmail.com,+49(0) 309232719,DE63100500003166587603,DEUTDEBB101,EH-040,True,False,False,de
+EIG-024,Herr,Willfried,Harloff,,Clara-Bauer-Ring 7-4,45299,Eberswalde,DE,willfried.harloff@yahoo.de,+49(0)9314 919058,DE72370400446688937346,COBADEFFXXX,EH-013,False,False,False,de
+EIG-025,Frau,Hiltrud,Speer,,Schusterallee 32-96,18506,Büsingen am Hochrhein,DE,hiltrud.speer@t-online.de,(04987) 76945,DE33100700008069901627,COBADEFFXXX,EH-003,False,False,False,de
+EIG-026,Frau,Silja,Henschel,,Junkplatz 53-65,47379,Husum,DE,silja.henschel@posteo.de,+49(0)9480 83136,DE93120300004641708053,COBADEFFXXX,EH-020,True,False,False,de
+EIG-027,Herr,Ingolf,Röhricht,,Leonardo-Spieß-Weg 97/68,77701,Gadebusch,DE,ingolf.roehricht@gmail.com,0855744431,DE57100100109232719374,PBNKDEFFXXX,EH-014,True,False,False,de
+EIG-028,Herr,Oswald,Gröttner,,Marlies-Gude-Ring 1524,18233,Göppingen,DE,oswald.groettner@t-online.de,02400 84271,DE97100100104966319314,GENODEF1P01,EH-022,False,True,False,de
+EIG-029,Herr,Sükrü,Aumann,,Marie-Bolzmann-Straße 11-39,77752,Greifswald,DE,suekrue.aumann@posteo.de,+49 (0) 9413 186999,DE65100100108506716572,PBNKDEFFXXX,EH-041,False,False,False,de
+EIG-030,Frau,Dorothe,Wulf,,Trudel-Wiek-Platz 4412,77496,Ribnitz-Damgarten,DE,dorothe.wulf@icloud.com,+49 (0) 8120 679740,DE95100700004531473799,DEUTDEBB101,EH-046,False,False,False,de
+EIG-031,Frau,Dörthe,Hövel,,Friedericke-Fischer-Ring 310,71349,Magdeburg,DE,doerthe.hoevel@t-online.de,+49(0)9947 17464,DE62370400445494808313,DEUTDEBB101,EH-021,False,True,False,de
+EIG-032,Frau,Jo,Reuter,,Dirk-Hein-Allee 4,71906,Schleiz,DE,jo.reuter@icloud.com,(00278) 742967,DE64370400443634957885,BELADEBEXXX,EH-051,False,True,False,de
+EIG-033,Frau,Xenia,Conradi,,Hövelweg 9-1,56551,Hohenmölsen,DE,xenia.conradi@outlook.com,01545 168087,DE85100500001351823374,HYVEDEMMXXX,EH-008,True,False,False,de
+EIG-034,Herr,Harro,Bloch,,Susann-Hövel-Straße 41-30,85977,Forchheim,DE,harro.bloch@gmail.com,+49(0)8086 13171,DE99370400442408240084,PBNKDEFFXXX,EH-004,True,False,False,de
+EIG-035,Herr,Markus,Fliegner,,Ramon-Grein Groth-Weg 714,48467,Gifhorn,DE,markus.fliegner@gmx.de,08404499727,DE83120300005204711671,BELADEBEXXX,EH-006,False,True,False,de

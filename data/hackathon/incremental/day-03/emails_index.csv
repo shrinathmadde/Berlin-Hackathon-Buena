@@ -1,0 +1,5 @@
+id,datetime,thread_id,direction,from_email,to_email,subject,category,sprache,error_types,filename,month_dir
+EMAIL-06555,2026-01-03T12:33:00,THR-I03-0001,incoming,magrit.mitschke@gmail.com,info@huber-partner-verwaltung.de,Mietminderung Ankuendigung,mieter/rechtlich,de,,20260103_123300_EMAIL-06555.eml,2026-01
+EMAIL-06556,2026-01-03T12:56:00,THR-I03-0002,incoming,silja.henschel@posteo.de,info@huber-partner-verwaltung.de,Frage zur Hausgeldabrechnung,eigentuemer/abrechnung,de,,20260103_125600_EMAIL-06556.eml,2026-01
+EMAIL-06557,2026-01-03T16:41:00,THR-I03-0003,incoming,osman.jacob@yahoo.de,info@huber-partner-verwaltung.de,Modernisierung - Zustimmung,eigentuemer/modernisierung,de,,20260103_164100_EMAIL-06557.eml,2026-01
+EMAIL-06558,2026-01-04T14:56:00,THR-I03-0002,outgoing,a.berger@huber-partner-verwaltung.de,silja.henschel@posteo.de,Re: Frage zur Hausgeldabrechnung,eigentuemer/abrechnung,de,,20260104_145600_EMAIL-06558.eml,2026-01

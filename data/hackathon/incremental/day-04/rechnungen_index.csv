@@ -1,0 +1,2 @@
+id,rechnungsnr,datum,dienstleister_id,dienstleister_firma,empfaenger,netto,mwst,brutto,iban,error_types,filename,month_dir
+INV-00198,INV-2026-0198,2026-01-04,DL-001,Hausmeister Mueller GmbH,Huber & Partner Immobilienverwaltung GmbH,915.00,173.85,1088.85,DE94100701240494519832,,20260104_DL-001_INV-00198.pdf,2026-01

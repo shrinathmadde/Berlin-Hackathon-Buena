@@ -1,0 +1,2 @@
+id,rechnungsnr,datum,dienstleister_id,dienstleister_firma,empfaenger,netto,mwst,brutto,iban,error_types,filename,month_dir
+INV-00200,INV-2026-0200,2026-01-06,DL-013,Sanitaer Schulze GmbH,Huber & Partner Immobilienverwaltung GmbH,177.40,33.71,211.11,DE77100100107151820377,,20260106_DL-013_INV-00200.pdf,2026-01

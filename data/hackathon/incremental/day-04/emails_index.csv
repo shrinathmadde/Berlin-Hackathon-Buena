@@ -1,0 +1,5 @@
+id,datetime,thread_id,direction,from_email,to_email,subject,category,sprache,error_types,filename,month_dir
+EMAIL-06559,2026-01-04T11:38:00,THR-I04-0001,incoming,hanna.schweitzer@gmx.de,info@huber-partner-verwaltung.de,Kuendigung Mietvertrag,mieter/kuendigung,de,,20260104_113800_EMAIL-06559.eml,2026-01
+EMAIL-06560,2026-01-04T12:29:00,THR-I04-0002,incoming,louise.ladeck@outlook.com,info@huber-partner-verwaltung.de,Ruhestoerung,mieter/nachbarn,de,,20260104_122900_EMAIL-06560.eml,2026-01
+EMAIL-06561,2026-01-04T14:12:00,THR-I04-0003,incoming,markus.fliegner@gmx.de,info@huber-partner-verwaltung.de,Mieterwechsel in WE 06,eigentuemer/sev,de,,20260104_141200_EMAIL-06561.eml,2026-01
+EMAIL-06562,2026-01-04T15:48:00,THR-I04-0004,incoming,kranz.vermoegensverwaltung@capital-partners.com,info@huber-partner-verwaltung.de,Verkaufsabsicht WE 11,eigentuemer/verkauf,de,,20260104_154800_EMAIL-06562.eml,2026-01

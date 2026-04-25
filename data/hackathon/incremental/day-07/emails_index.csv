@@ -1,0 +1,5 @@
+id,datetime,thread_id,direction,from_email,to_email,subject,category,sprache,error_types,filename,month_dir
+EMAIL-06571,2026-01-07T10:15:00,THR-I07-0001,incoming,winfried.ullmann@yahoo.de,info@huber-partner-verwaltung.de,Modernisierung - Zustimmung,eigentuemer/modernisierung,de,,20260107_101500_EMAIL-06571.eml,2026-01
+EMAIL-06572,2026-01-07T10:54:00,THR-I07-0002,incoming,ernst.august.jessel@sanitaer-schulze.de,info@huber-partner-verwaltung.de,Wartungsbericht,dienstleister/bericht,de,,20260107_105400_EMAIL-06572.eml,2026-01
+EMAIL-06573,2026-01-07T17:26:00,THR-I07-0003,incoming,irmengard.mentzel@gasag-berliner-gaswerke-ag.de,info@huber-partner-verwaltung.de,Rechnung RE-2026-6322,dienstleister/rechnung,de,,20260107_172600_EMAIL-06573.eml,2026-01
+EMAIL-06574,2026-01-09T06:26:00,THR-I07-0003,outgoing,t.kreuzer@huber-partner-verwaltung.de,irmengard.mentzel@gasag-berliner-gaswerke-ag.de,Re: Rechnung RE-2026-6322,dienstleister/rechnung,de,,20260109_062600_EMAIL-06574.eml,2026-01

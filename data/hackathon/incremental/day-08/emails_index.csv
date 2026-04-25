@@ -1,0 +1,5 @@
+id,datetime,thread_id,direction,from_email,to_email,subject,category,sprache,error_types,filename,month_dir
+EMAIL-06575,2026-01-08T10:53:00,THR-I08-0001,incoming,magrit.mitschke@gmail.com,info@huber-partner-verwaltung.de,Internet/TV-Anschluss,mieter/info,de,,20260108_105300_EMAIL-06575.eml,2026-01
+EMAIL-06576,2026-01-08T14:58:00,THR-I08-0002,incoming,galina.wohlgemut@outlook.com,info@huber-partner-verwaltung.de,Haustuer schliesst nicht,mieter/schaden,de,,20260108_145800_EMAIL-06576.eml,2026-01
+EMAIL-06577,2026-01-08T17:46:00,THR-I08-0003,incoming,edeltraud.renner@gmx.de,info@huber-partner-verwaltung.de,Mietminderung Ankuendigung,mieter/rechtlich,de,,20260108_174600_EMAIL-06577.eml,2026-01
+EMAIL-06578,2026-01-09T14:53:00,THR-I08-0001,outgoing,sabine.huber@huber-partner-verwaltung.de,magrit.mitschke@gmail.com,Re: Internet/TV-Anschluss,mieter/info,de,,20260109_145300_EMAIL-06578.eml,2026-01

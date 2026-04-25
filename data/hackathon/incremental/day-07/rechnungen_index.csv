@@ -1,0 +1,2 @@
+id,rechnungsnr,datum,dienstleister_id,dienstleister_firma,empfaenger,netto,mwst,brutto,iban,error_types,filename,month_dir
+INV-00201,2026/00201,2026-01-07,DL-004,Reinigungsservice Kowalski,Huber & Partner Immobilienverwaltung GmbH,339.20,64.45,403.65,DE44100701245991022901,,20260107_DL-004_INV-00201.pdf,2026-01

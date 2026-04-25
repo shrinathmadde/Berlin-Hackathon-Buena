@@ -1,0 +1,5 @@
+id,datetime,thread_id,direction,from_email,to_email,subject,category,sprache,error_types,filename,month_dir
+EMAIL-06579,2026-01-09T12:06:00,THR-I09-0001,incoming,irmingard.margraf@t-online.de,info@huber-partner-verwaltung.de,SEV - Monatsauszug,eigentuemer/sev,de,,20260109_120600_EMAIL-06579.eml,2026-01
+EMAIL-06580,2026-01-09T13:03:00,THR-I09-0002,incoming,malte.becker@reinigungsservice-kowalski.de,info@huber-partner-verwaltung.de,Nachtrag Reparatur,dienstleister/nachtrag,de,,20260109_130300_EMAIL-06580.eml,2026-01
+EMAIL-06581,2026-01-09T16:16:00,THR-I09-0003,incoming,ronald.kelley@icloud.com,info@huber-partner-verwaltung.de,Question about annual statement,eigentuemer/abrechnung,en,,20260109_161600_EMAIL-06581.eml,2026-01
+EMAIL-06582,2026-01-10T01:03:00,THR-I09-0002,outgoing,t.kreuzer@huber-partner-verwaltung.de,malte.becker@reinigungsservice-kowalski.de,Re: Nachtrag Reparatur,dienstleister/nachtrag,de,,20260110_010300_EMAIL-06582.eml,2026-01

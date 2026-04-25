@@ -1,0 +1,2 @@
+Auftragskonto;Buchungstag;Valutadatum;Buchungstext;Verwendungszweck;Glaeubiger-ID;Mandatsreferenz;Kundenreferenz (End-to-End);Sammlerreferenz;Lastschrift Ursprungsbetrag;Auslagenersatz Ruecklastschrift;Beguenstigter/Zahlungspflichtiger;Kontonummer/IBAN;BIC (SWIFT-Code);Betrag;Waehrung;Info
+DE02 1001 0010 0123 4567 89;10.01.2026;10.01.2026;Ueberweisung;Rechnung INV-2026-0200 Sanitaer Schulze GmbH;;;TX-01625;;;;Sanitaer Schulze GmbH;DE77100100107151820377;GENODEF1P01;-211,11;EUR;Saldo: 929578,98

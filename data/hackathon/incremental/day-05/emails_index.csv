@@ -1,0 +1,5 @@
+id,datetime,thread_id,direction,from_email,to_email,subject,category,sprache,error_types,filename,month_dir
+EMAIL-06563,2026-01-05T11:45:00,THR-I05-0001,incoming,slawomir.soelzer@hausmeister-mueller.de,info@huber-partner-verwaltung.de,Rechnung RE-2026-1492,dienstleister/rechnung,de,,20260105_114500_EMAIL-06563.eml,2026-01
+EMAIL-06564,2026-01-05T13:42:00,THR-I05-0002,incoming,irmingard.margraf@t-online.de,info@huber-partner-verwaltung.de,Sonderumlage - Einspruch,eigentuemer/rechtlich,de,,20260105_134200_EMAIL-06564.eml,2026-01
+EMAIL-06565,2026-01-05T23:42:00,THR-I05-0002,outgoing,sabine.huber@huber-partner-verwaltung.de,irmingard.margraf@t-online.de,Re: Sonderumlage - Einspruch,eigentuemer/rechtlich,de,,20260105_234200_EMAIL-06565.eml,2026-01
+EMAIL-06566,2026-01-07T04:45:00,THR-I05-0001,outgoing,a.berger@huber-partner-verwaltung.de,slawomir.soelzer@hausmeister-mueller.de,Re: Rechnung RE-2026-1492,dienstleister/rechnung,de,,20260107_044500_EMAIL-06566.eml,2026-01

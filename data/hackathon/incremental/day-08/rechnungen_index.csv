@@ -1,0 +1,2 @@
+id,rechnungsnr,datum,dienstleister_id,dienstleister_firma,empfaenger,netto,mwst,brutto,iban,error_types,filename,month_dir
+INV-00202,INV-2026-0202,2026-01-08,DL-012,Elektro Schmidt e.K.,Huber & Partner Immobilienverwaltung GmbH,180.00,34.20,214.20,DE83100100101998679807,,20260108_DL-012_INV-00202.pdf,2026-01

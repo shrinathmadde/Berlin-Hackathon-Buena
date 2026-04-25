@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "day_index": 3,
+  "content_date": "2026-01-03",
+  "seed": 42,
+  "difficulty": "medium",
+  "emails_written": 4,
+  "invoices_written": 1,
+  "bank_transactions_written": 1,
+  "stammdaten_relative": "../stammdaten/stammdaten.json",
+  "note": "Nur Delta-Dateien. Basis-Paket (Stammdaten, Archiv-Mails, ...) liegt im uebergeordneten Ordner."
+}

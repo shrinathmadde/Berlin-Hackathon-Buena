@@ -1,0 +1,5 @@
+id,datetime,thread_id,direction,from_email,to_email,subject,category,sprache,error_types,filename,month_dir
+EMAIL-06567,2026-01-06T09:31:00,THR-I06-0001,incoming,tom.hartmann@icloud.com,info@huber-partner-verwaltung.de,Sonderumlage - Einspruch,eigentuemer/rechtlich,de,,20260106_093100_EMAIL-06567.eml,2026-01
+EMAIL-06568,2026-01-06T15:16:00,THR-I06-0002,incoming,rolf.schoenland@allianz-versicherungs-ag.de,info@huber-partner-verwaltung.de,Rechnung RE-2026-2285,dienstleister/rechnung,de,,20260106_151600_EMAIL-06568.eml,2026-01
+EMAIL-06569,2026-01-06T16:05:00,THR-I06-0003,incoming,carsten.austermuehle@web.de,info@huber-partner-verwaltung.de,Internet/TV-Anschluss,mieter/info,de,,20260106_160500_EMAIL-06569.eml,2026-01
+EMAIL-06570,2026-01-06T16:31:00,THR-I06-0001,outgoing,a.berger@huber-partner-verwaltung.de,tom.hartmann@icloud.com,Re: Sonderumlage - Einspruch,eigentuemer/rechtlich,de,,20260106_163100_EMAIL-06570.eml,2026-01

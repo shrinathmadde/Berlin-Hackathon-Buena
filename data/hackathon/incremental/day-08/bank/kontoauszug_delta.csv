@@ -1,0 +1,2 @@
+Auftragskonto;Buchungstag;Valutadatum;Buchungstext;Verwendungszweck;Glaeubiger-ID;Mandatsreferenz;Kundenreferenz (End-to-End);Sammlerreferenz;Lastschrift Ursprungsbetrag;Auslagenersatz Ruecklastschrift;Beguenstigter/Zahlungspflichtiger;Kontonummer/IBAN;BIC (SWIFT-Code);Betrag;Waehrung;Info
+DE02 1001 0010 0123 4567 89;09.01.2026;09.01.2026;Ueberweisung;Rechnung INV-2026-0202 Elektro Schmidt e.K.;;;TX-01627;;;;Elektro Schmidt e.K.;DE83100100101998679807;BELADEBEXXX;-214,20;EUR;Saldo: 928961,13

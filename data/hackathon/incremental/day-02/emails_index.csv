@@ -1,0 +1,5 @@
+id,datetime,thread_id,direction,from_email,to_email,subject,category,sprache,error_types,filename,month_dir
+EMAIL-06551,2026-01-02T08:26:00,THR-I02-0001,incoming,rolf.schoenland@allianz-versicherungs-ag.de,info@huber-partner-verwaltung.de,Abschlagsanpassung,versorger/versorger,de,,20260102_082600_EMAIL-06551.eml,2026-01
+EMAIL-06552,2026-01-02T10:25:00,THR-I02-0002,incoming,anni.wagenknecht@gmx.de,info@huber-partner-verwaltung.de,Mieterwechsel in WE 48,eigentuemer/sev,de,,20260102_102500_EMAIL-06552.eml,2026-01
+EMAIL-06553,2026-01-02T13:25:00,THR-I02-0002,outgoing,a.berger@huber-partner-verwaltung.de,anni.wagenknecht@gmx.de,Re: Mieterwechsel in WE 48,eigentuemer/sev,de,,20260102_132500_EMAIL-06553.eml,2026-01
+EMAIL-06554,2026-01-02T13:32:00,THR-I02-0003,incoming,rolf.schoenland@allianz-versicherungs-ag.de,info@huber-partner-verwaltung.de,Mahnung Rechnung RE-2026-8503,dienstleister/mahnung,de,,20260102_133200_EMAIL-06554.eml,2026-01
