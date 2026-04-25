@@ -1,12 +1,270 @@
-# Hackathon Dataset: WEG Immanuelkirchstraße 26
+# Buena Context Engine — WEG Immanuelkirchstraße 26
 
-Synthetic dataset simulating the complete data ecosystem of a German property management firm.
-The property is a **Wohnungseigentümergemeinschaft (WEG)** — a condominium association —
-managed by *Huber & Partner Immobilienverwaltung GmbH*.
+Hackathon submission for the **Buena Context Engine** track.
+
+The goal: produce a single, living context store per property that an AI agent can query
+in microseconds and patch surgically as new information arrives. Instead of a markdown
+file, this implementation uses **SQL as the storage format** — structured tables for clean
+entities, a dedicated `facts` table for everything that doesn't fit a column, and a
+`source_events` table for full provenance.
+
+> Organizers confirmed the brief cares about **speed of update** and **speed of query**,
+> not the on-disk format. SQL wins on both axes for this dataset.
 
 ---
 
-## The Property
+## Quickstart
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m uvicorn app.main:app --reload
+```
+
+OpenAPI UI: <http://localhost:8000/docs>
+
+The default database is SQLite (`./context_engine.db`). Override with `DATABASE_URL` to
+swap in Postgres.
+
+---
+
+## Repository Layout
+
+```
+.
+├── app/                       # FastAPI + SQLModel implementation
+│   ├── main.py                # mounts all routers, creates tables on startup
+│   ├── database.py            # engine + session factory
+│   ├── models.py              # all SQLModel tables
+│   └── routers/
+│       ├── crud.py            # generic CRUD factory for structured tables
+│       ├── facts.py           # /facts + supersede / conflict operations
+│       └── context.py         # /context/{entity}/{id} aggregate views
+├── data/hackathon/            # Provided synthetic dataset (see Dataset section)
+└── requirements.txt
+```
+
+---
+
+## Architecture
+
+Two storage layers, one provenance layer:
+
+```
+┌──────────────────────┐     ┌──────────────────────┐
+│  Structured tables   │     │     facts table      │
+│  ────────────────    │     │  ────────────────    │
+│  properties          │     │  fact_id             │
+│  buildings           │     │  property_id    ───┐ │
+│  units      ──┐      │     │  entity_type       │ │
+│  owners       │      │     │  entity_id         │ │
+│  tenants      │      │     │  category          │ │
+│  service_     │      │     │  statement         │ │
+│   providers   │      │     │  source_event_id ─┐│ │
+│  bank_        │      │     │  superseded_by    ││ │
+│   transactions│      │     │  status           ││ │
+│  invoices     │      │     │                   ││ │
+└───────┬──────┘       │     └────────────────────┘│ │
+        │              │                           │ │
+        │              │     ┌──────────────────────┘ │
+        │              │     │                        │
+        │              │     ▼                        ▼
+        │              │  ┌──────────────────┐   (entity_id refers to
+        │              └──┤  source_events   │    rows in the structured
+        │                 │  ──────────────  │    tables on the left,
+        │                 │  event_id        │    by string PK)
+        └────────────────►│  source_type     │
+            (provenance   │  source_path     │
+             on invoices) │  thread_id       │
+                          │  received_at     │
+                          │  raw_content     │
+                          └──────────────────┘
+```
+
+**Why this shape:**
+
+- **Structured tables** answer fast lookups: *"who owns EH-014?"* is one indexed query.
+- **`facts`** holds anything unstructured (preferences, open issues, council decisions,
+  complaints). One row per fact — never a concatenated blob — so updates stay surgical.
+- **`source_events`** anchors every fact to the email / PDF / CSV row it came from,
+  satisfying the brief's "traced to its source" requirement.
+- **Supersession chain** (`superseded_by`) preserves history without bloating active
+  queries: live questions filter `WHERE status = 'active'`.
+
+---
+
+## Database Schema
+
+### Structured entity tables
+
+| Table | PK | Purpose |
+|---|---|---|
+| `properties` | `property_id` (`LIE-001`) | The condominium association (1 row for the whole hackathon dataset). Holds manager contact, WEG and reserve account IBANs. |
+| `buildings` | `building_id` (`HAUS-12/14/16`) | Physical buildings within a property. |
+| `units` | `unit_id` (`EH-001`…`EH-052`) | Individual apartments / commercial units / parking spots. |
+| `owners` | `owner_id` (`EIG-001`…`EIG-035`) | Persons or companies that own one or more units. |
+| `tenants` | `tenant_id` (`MIE-001`…`MIE-026`) | Renters of a specific unit, with lease terms and bank account. |
+| `service_providers` | `provider_id` (`DL-001`…`DL-016`) | Caretakers, contractors, utilities. |
+| `bank_transactions` | `transaction_id` (`TX-NNNNN`) | Every line item from the WEG account. |
+| `invoices` | `invoice_id` (`INV-NNNNN`) | Provider invoices, linked to their PDF source event. |
+
+### Provenance + flexible layer
+
+| Table | PK | Purpose |
+|---|---|---|
+| `source_events` | `event_id` (`EMAIL-NNNNN` / `LTR-NNNN` / `INV-NNNNN` / `TX-NNNNN`) | One row per ingested document. Every fact and invoice can point back here. |
+| `facts` | `fact_id` (`FACT-<hex>`) | The flexible layer. One row per atomic fact, with entity binding, provenance, and supersession chain. |
+
+### Foreign-key relations
+
+```
+properties ──┬─< buildings ──< units ─┬─< tenants
+             │                        │
+             │                        └── owner_id ──> owners
+             │
+             ├─< bank_transactions
+             ├─< invoices ──> service_providers
+             │            └── source_event_id ──> source_events
+             │
+             ├─< source_events
+             └─< facts ─┬─> source_events
+                        ├─> facts (superseded_by, self-ref)
+                        └── (entity_type, entity_id)  ── soft-FK to any
+                                                         structured table
+```
+
+The `facts` table uses a **soft foreign key** pattern: `entity_type` names the table
+(`owner`, `tenant`, `unit`, `building`, `service_provider`, `property`) and `entity_id`
+holds the PK value of that row. This keeps the table polymorphic without dozens of
+nullable FKs.
+
+### Column reference
+
+#### `properties`
+`property_id`, `name`, `street`, `postal_code`, `city`, `country`, `built_year`,
+`renovated_year`, `manager_name`, `manager_street`, `manager_postal_code`,
+`manager_city`, `manager_email`, `manager_phone`, `manager_iban`, `manager_bic`,
+`manager_bank`, `manager_tax_number`, `weg_account_iban`, `weg_account_bic`,
+`weg_account_bank`, `reserve_account_iban`, `reserve_account_bic`.
+
+#### `buildings`
+`building_id`, `property_id` → properties, `house_number`, `units_count`, `floors`,
+`has_elevator`, `built_year`.
+
+#### `units`
+`unit_id`, `building_id` → buildings, `property_id` → properties, `owner_id` → owners,
+`unit_number`, `location`, `type` (Wohnung/Tiefgarage/Gewerbe), `area_sqm`, `rooms`,
+`ownership_share`.
+
+#### `owners`
+`owner_id`, `salutation`, `first_name`, `last_name`, `company`, `street`, `postal_code`,
+`city`, `country`, `email` (indexed), `phone`, `iban`, `bic`, `is_self_user` (selbstnutzer),
+`has_sev_mandate`, `is_council_member` (beirat), `language`.
+
+#### `tenants`
+`tenant_id`, `salutation`, `first_name`, `last_name`, `email` (indexed), `phone`,
+`unit_id` → units, `landlord_owner_id` → owners, `lease_start`, `lease_end`,
+`cold_rent`, `utility_advance`, `deposit`, `iban`, `bic`, `language`.
+
+#### `service_providers`
+`provider_id`, `company`, `branch` (indexed), `contact_person`, `email` (indexed),
+`phone`, `street`, `postal_code`, `city`, `country`, `iban`, `bic`, `vat_id`,
+`tax_number`, `style`, `language`, `monthly_contract`, `hourly_rate`.
+
+#### `bank_transactions`
+`transaction_id`, `property_id` → properties, `booking_date` (indexed), `direction`
+(CREDIT/DEBIT), `amount`, `category` (indexed), `counterparty_name`, `purpose`,
+`reference_id` (indexed; soft-link to `MIE-`/`DL-`/`EIG-`), `error_types`.
+
+#### `invoices`
+`invoice_id`, `invoice_number`, `invoice_date` (indexed), `provider_id` →
+service_providers, `provider_company`, `recipient`, `property_id` → properties,
+`net_amount`, `vat_amount`, `gross_amount`, `iban`, `paid_transaction_id` →
+bank_transactions, `source_event_id` → source_events, `error_types`.
+
+#### `source_events`
+`event_id`, `source_type` (indexed; email/pdf_letter/pdf_invoice/bank_tx/csv_import),
+`property_id` → properties, `source_path`, `received_at` (indexed), `thread_id`
+(indexed), `direction`, `from_address` (indexed), `to_address`, `subject`, `category`
+(indexed), `language`, `raw_content`, `error_types`.
+
+#### `facts`
+`fact_id`, `property_id` → properties, `entity_type` (indexed), `entity_id` (indexed),
+`category` (indexed), `statement`, `source_event_id` → source_events,
+`extracted_at` (indexed), `superseded_by` → facts (self-ref), `status` (indexed;
+active/superseded/conflicted), `confidence`.
+
+---
+
+## API Endpoints
+
+Every structured table gets a uniform set of routes via the generic CRUD factory:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET`    | `/{prefix}` | List with `limit` + `offset` |
+| `GET`    | `/{prefix}/{id}` | Fetch one |
+| `POST`   | `/{prefix}` | Create (ID must be supplied) |
+| `PATCH`  | `/{prefix}/{id}` | Partial update — surgical update path for structured fields |
+| `DELETE` | `/{prefix}/{id}` | Delete |
+
+Mounted prefixes: `/properties`, `/buildings`, `/units`, `/owners`, `/tenants`,
+`/providers`, `/transactions`, `/invoices`, `/events`.
+
+### Facts (the flexible layer)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET`  | `/facts` | Filter by `property_id`, `entity_type`, `entity_id`, `category`, `status` (default `active`) |
+| `GET`  | `/facts/{id}` | Fetch one |
+| `POST` | `/facts` | Create a new fact tied to an entity + source event |
+| `POST` | `/facts/{id}/supersede` | **Surgical update.** Inserts a new active fact, marks the old one `superseded`, links them via `superseded_by` |
+| `POST` | `/facts/{id}/conflict` | Mark a fact `conflicted` for human review |
+| `DELETE` | `/facts/{id}` | Delete |
+
+### Aggregate context views
+
+Single-call "give me everything about X" — what an AI agent would hit before drafting a reply.
+
+| Path | Returns |
+|---|---|
+| `GET /context/property/{id}` | Property row + buildings + unit count + active facts |
+| `GET /context/unit/{id}` | Unit + current owner + active tenant + active facts |
+| `GET /context/owner/{id}` | Owner + their units + active facts |
+| `GET /context/tenant/{id}` | Tenant + their unit + landlord + active facts |
+| `GET /context/provider/{id}` | Provider + last 20 invoices + active facts |
+| `GET /context/source/{event_id}` | Source event + every fact derived from it |
+
+### Health
+
+`GET /health` → `{"status": "ok"}`
+
+---
+
+## How updates stay surgical
+
+When a new email arrives saying *"the owner now prefers email instead of WhatsApp"*:
+
+1. The ingestion pipeline writes a row into `source_events` (`event_id = EMAIL-XXXXX`).
+2. The extractor finds the existing fact for `(owner=EIG-007, category=communication_preference)`.
+3. It calls `POST /facts/{id}/supersede` with the new statement and the new
+   `source_event_id`.
+4. The endpoint inserts one new row, updates one column on the old row, commits.
+   Two writes, microseconds. The old fact is preserved with full history; future
+   queries that filter `status = 'active'` only see the new one.
+
+No file parsing, no diffing, no risk of stomping on a human edit elsewhere in the
+document — by construction, the update only touches the affected fact row.
+
+---
+
+## Dataset
+
+The provided synthetic dataset lives in `data/hackathon/`. It simulates the complete
+data ecosystem of a German property management firm: master records, two years of
+emails, bank statements, printed letters, and a 10-day incremental feed.
+
+### The Property
 
 | Field | Value |
 |---|---|
@@ -24,9 +282,7 @@ managed by *Huber & Partner Immobilienverwaltung GmbH*.
 | Nr. 14 | `HAUS-14` | 20 | 5 | Yes |
 | Nr. 16 | `HAUS-16` | 14 | 4 | No |
 
----
-
-## Directory Structure
+### Directory structure
 
 ```
 data/hackathon/
@@ -35,94 +291,41 @@ data/hackathon/
 ├── emails/              # Archive emails (Jan 2024 – Jan 2026)
 ├── briefe/              # Printed letters as PDFs (Apr 2024 – Oct 2025)
 └── incremental/         # Simulated daily feeds (10 days, Jan 2026)
-    ├── day-01/
-    ├── day-02/
-    ...
-    └── day-10/
 ```
 
----
+### `stammdaten/` — Master Data
 
-## 1. `stammdaten/` — Master Data
+Ground truth for all entities. These records change rarely.
 
-The ground truth for all entities. These records change rarely (new owner, new tenant, etc.).
+- **`stammdaten.json`** — Full property graph: `liegenschaft → gebaeude → einheiten`,
+  with embedded current `eigentuemer` and `mieter`.
+- **`eigentuemer.csv`** — 35 owners. Columns: `id`, `anrede`, `vorname`, `nachname`,
+  `firma`, `email`, `telefon`, `iban`, `bic`, `einheit_ids` (semicolon-separated),
+  `selbstnutzer`, `sev_mandat`, `beirat`, `sprache`.
+- **`mieter.csv`** — 26 tenants. Columns: `id`, `einheit_id`, `eigentuemer_id`,
+  `mietbeginn`, `mietende`, `kaltmiete`, `nk_vorauszahlung`, `kaution`, `iban`,
+  `bic`, `sprache`.
+- **`einheiten.csv`** — 52 units. Columns: `id`, `haus_id`, `einheit_nr`, `lage`,
+  `typ` (Wohnung/Tiefgarage/Gewerbe), `wohnflaeche_qm`, `zimmer`, `miteigentumsanteil`.
+- **`dienstleister.csv`** — 16 service providers. Columns: `id`, `firma`, `branche`,
+  `ansprechpartner`, `email`, `iban`, `bic`, `ust_id`, `steuernummer`,
+  `vertrag_monatlich`, `stundensatz`.
 
-### `stammdaten.json`
-Single JSON file containing the entire property graph: `liegenschaft` → `gebaeude` → `einheiten`, each unit embedded with its current `eigentuemer` and `mieter`. Use this as the authoritative join document.
+Service types covered: caretaker, elevator maintenance, heating, stairwell cleaning,
+gardening, chimney sweep, building insurance, electricity, gas, water, waste,
+electrician, plumbing, roofing, lock systems, facade cleaning.
 
-### `eigentuemer.csv` — Owners (35 records)
-| Column | Description |
+### `bank/` — Bank Statement History
+
+| File | Format |
 |---|---|
-| `id` | `EIG-001` … `EIG-035` |
-| `anrede` / `vorname` / `nachname` / `firma` | Name fields (person or company) |
-| `email`, `telefon` | Contact |
-| `iban`, `bic` | Bank account for Hausgeld payments |
-| `einheit_ids` | Semicolon-separated list of owned units (`EH-XXX`) |
-| `selbstnutzer` | Boolean — owner lives in the unit |
-| `sev_mandat` | Boolean — has SEV (Sondereigentumsverwaltung) mandate |
-| `beirat` | Boolean — member of the elected owners' council |
-| `sprache` | Preferred language (`de` / `en`) |
+| `bank_index.csv` | 1,619 transactions, indexed format |
+| `kontoauszug_2024_2025.csv` | Same data, bank-statement format |
+| `kontoauszug_2024_2025.camt053.xml` | Same data, ISO 20022 CAMT.053 XML |
 
-### `mieter.csv` — Tenants (26 records)
-| Column | Description |
-|---|---|
-| `id` | `MIE-001` … `MIE-026` |
-| `einheit_id` | The unit they rent |
-| `eigentuemer_id` | The landlord owner for that unit |
-| `mietbeginn` / `mietende` | Lease start / end (end empty = active) |
-| `kaltmiete` | Net cold rent (€/month) |
-| `nk_vorauszahlung` | Utility advance payment (€/month) |
-| `kaution` | Security deposit (€) |
-| `iban`, `bic` | Tenant's bank account |
-| `sprache` | Preferred language |
+Columns in `bank_index.csv`: `id`, `datum`, `typ` (CREDIT/DEBIT), `betrag`, `kategorie`,
+`gegen_name`, `verwendungszweck`, `referenz_id`, `error_types`.
 
-### `einheiten.csv` — Units (52 records)
-| Column | Description |
-|---|---|
-| `id` | `EH-001` … `EH-052` |
-| `haus_id` | `HAUS-12`, `HAUS-14`, or `HAUS-16` |
-| `einheit_nr` | Unit number (e.g., `WE 01`, `TG 18`, `GE 37`) |
-| `lage` | Floor/position (e.g., `1. OG links`) |
-| `typ` | `Wohnung` (apartment), `Tiefgarage` (underground parking), `Gewerbe` (commercial) |
-| `wohnflaeche_qm` | Area in m² |
-| `zimmer` | Number of rooms |
-| `miteigentumsanteil` | Co-ownership share (denominator ~10,000) |
-
-### `dienstleister.csv` — Service Providers (16 records)
-| Column | Description |
-|---|---|
-| `id` | `DL-001` … `DL-016` |
-| `firma` | Company name |
-| `branche` | Service category (e.g., `Hausmeisterdienst`, `Heizungswartung`, `Strom Allgemein`) |
-| `ansprechpartner` | Contact person |
-| `email`, `telefon` | Contact |
-| `iban`, `bic` | Account for invoice payments |
-| `ust_id`, `steuernummer` | Tax identifiers |
-| `vertrag_monatlich` | Monthly flat rate (€, 0 = ad-hoc) |
-| `stundensatz` | Hourly rate (€) |
-
-Service types covered: caretaker, elevator maintenance, heating, stairwell cleaning, gardening, chimney sweep, building insurance, electricity, gas, water, waste, electrician, plumbing, roofing, lock systems, facade cleaning.
-
----
-
-## 2. `bank/` — Bank Statement History
-
-Full transaction history for the WEG's main account (Jan 2024 – Dec 2025).
-
-### `bank_index.csv` — 1,619 transactions
-| Column | Description |
-|---|---|
-| `id` | `TX-00001` … |
-| `datum` | Transaction date |
-| `typ` | `CREDIT` (incoming) or `DEBIT` (outgoing) |
-| `betrag` | Amount in € |
-| `kategorie` | `hausgeld`, `miete`, `dienstleister`, `versorger`, `sonstige` |
-| `gegen_name` | Counterparty name |
-| `verwendungszweck` | Payment reference / purpose |
-| `referenz_id` | Links to `MIE-XXX`, `DL-XXX`, etc. |
-| `error_types` | Intentional data quality issues (for testing robustness) |
-
-**Category breakdown:**
 | Category | Count | Meaning |
 |---|---|---|
 | `hausgeld` | 806 | Monthly HOA fees from owners |
@@ -131,153 +334,73 @@ Full transaction history for the WEG's main account (Jan 2024 – Dec 2025).
 | `sonstige` | 26 | Miscellaneous |
 | `versorger` | 8 | Utility provider payments |
 
-### `kontoauszug_2024_2025.csv`
-Same data as `bank_index.csv` in bank-statement CSV format.
+### `emails/` — Archive Emails
 
-### `kontoauszug_2024_2025.camt053.xml`
-Same data in **CAMT.053** ISO 20022 XML format (standard bank statement format used by German banks).
+6,546 `.eml` files (Jan 2024 – Jan 2026), organised in monthly subdirectories
+(`YYYY-MM/`). Filename: `YYYYMMDD_HHMMSS_EMAIL-NNNNN.eml`. No global index — parse the
+files directly. Newer incremental emails come with structured indexes (see below).
 
----
+### `briefe/` — Printed Letters (PDFs)
 
-## 3. `emails/` — Archive Emails
+135 PDFs (Apr 2024 – Oct 2025), organised by month. Filename:
+`YYYYMMDD_<type>_LTR-NNNN.pdf`.
 
-**6,546 `.eml` files** covering Jan 2024 – Jan 2026, organized into 25 monthly subdirectories (`YYYY-MM/`).
-
-**Filename format:** `YYYYMMDD_HHMMSS_EMAIL-NNNNN.eml`
-
-Emails are plain-text MIME messages (German and occasionally English) between the property manager (`info@huber-partner-verwaltung.de`) and owners, tenants, service providers, and utility companies.
-
-There is no global index CSV for archive emails — the index lives in the incremental data for newer emails. Archive emails must be parsed from the `.eml` files directly.
-
-**Common subjects/senders:** invoice submissions, repair reports, owner assembly invitations, Hausgeld queries, tenant move-in/out, SEV reports, legal notices.
-
----
-
-## 4. `briefe/` — Printed Letters (PDFs)
-
-**135 PDFs** organized by month (`YYYY-MM/`), covering Apr 2024 – Oct 2025.
-
-**Filename format:** `YYYYMMDD_<type>_LTR-NNNN.pdf`
-
-**Letter types:**
-| Type in filename | Count | Meaning |
+| Type | Count | Meaning |
 |---|---|---|
-| `etv` | 72 | Eigentümerversammlung (owner assembly) — invitations & minutes |
-| `hausgeld` | 35 | Hausgeld statements sent to owners |
+| `etv` | 72 | Owner assembly invitations / minutes |
+| `hausgeld` | 35 | Hausgeld statements to owners |
 | `bka` | 13 | Beschlusskatalog (resolution catalogue) |
-| `mahnung` | 10 | Dunning / payment reminders |
+| `mahnung` | 10 | Dunning notices |
 | `mieterhoehung` | 3 | Rent increase notices |
 | `kuendigung` | 2 | Lease termination notices |
 
----
+### `incremental/` — Daily Feeds (10 Days)
 
-## 5. `incremental/` — Daily Feeds (10 Days)
-
-Simulates real-time data arriving over 10 working days starting **2026-01-01**.
-This is the primary test harness for the Context Engine's **surgical update** capability.
-
-Each `day-NN/` folder contains:
+Simulates real-time data arriving over 10 working days starting **2026-01-01** —
+the primary test harness for the surgical-update capability. Each `day-NN/` folder:
 
 ```
 day-01/
-├── incremental_manifest.json   # Metadata for this delta
-├── emails_index.csv            # Index of new emails this day
-├── rechnungen_index.csv        # Index of new invoices this day
-├── emails/
-│   └── 2026-01/               # New .eml files
-├── rechnungen/
-│   └── 2026-01/               # New invoice PDFs
+├── incremental_manifest.json   # day metadata + write counts
+├── emails_index.csv            # new emails this day
+├── rechnungen_index.csv        # new invoices this day
+├── emails/2026-01/             # the .eml files
+├── rechnungen/2026-01/         # the invoice PDFs
 └── bank/
-    ├── bank_index.csv          # Cumulative bank index (growing)
-    └── kontoauszug_delta.csv   # Only new transactions this day
+    ├── bank_index.csv          # cumulative bank index
+    └── kontoauszug_delta.csv   # only new transactions this day
 ```
 
-### `incremental_manifest.json`
-```json
-{
-  "schema_version": 1,
-  "day_index": 1,
-  "content_date": "2026-01-01",
-  "seed": 42,
-  "difficulty": "medium",
-  "emails_written": 4,
-  "invoices_written": 1,
-  "bank_transactions_written": 1
-}
-```
+`emails_index.csv` columns: `id`, `datetime`, `thread_id`, `direction`, `from_email`,
+`to_email`, `subject`, `category`, `sprache`, `error_types`, `filename`, `month_dir`.
 
-### `emails_index.csv` (incremental)
-Same schema as archive emails but with a structured index:
+**Email categories** in incremental data: `dienstleister/{rechnung,bericht,mahnung,nachtrag}`,
+`eigentuemer/{rechtlich,sev,abrechnung,modernisierung,verkauf}`,
+`mieter/{info,schaden,kaution,kuendigung,nachbarn,schluessel,rechtlich}`,
+`versorger/versorger`.
 
-| Column | Description |
-|---|---|
-| `id` | `EMAIL-06547` … (continues archive numbering) |
-| `datetime` | ISO 8601 timestamp |
-| `thread_id` | `THR-INN-XXXX` — groups replies into threads |
-| `direction` | `incoming` or `outgoing` |
-| `from_email` / `to_email` | Sender / recipient |
-| `subject` | Email subject |
-| `category` | Two-level category (see below) |
-| `sprache` | Language (`de` / `en`) |
-| `error_types` | Intentional data quality issues |
-| `filename` | `.eml` filename |
-| `month_dir` | Month subdirectory (`2026-01`) |
+`rechnungen_index.csv` columns: `id`, `rechnungsnr`, `datum`, `dienstleister_id`,
+`dienstleister_firma`, `empfaenger`, `netto`, `mwst`, `brutto`, `iban`, `filename`,
+`month_dir`.
 
-**Email categories** (across all 10 incremental days):
-| Category | Meaning |
-|---|---|
-| `dienstleister/rechnung` | Service provider invoice |
-| `dienstleister/bericht` | Service report |
-| `dienstleister/mahnung` / `nachtrag` | Dunning / supplement |
-| `eigentuemer/rechtlich` | Owner legal matter |
-| `eigentuemer/sev` | SEV (rental management) communication |
-| `eigentuemer/abrechnung` | Owner settlement/statement |
-| `eigentuemer/modernisierung` | Modernization/renovation |
-| `eigentuemer/verkauf` | Unit sale |
-| `mieter/info` | Tenant general inquiry |
-| `mieter/schaden` | Damage report |
-| `mieter/kaution` | Deposit matter |
-| `mieter/kuendigung` | Tenant termination |
-| `mieter/nachbarn` | Neighbor complaint |
-| `mieter/schluessel` | Key/access issue |
-| `mieter/rechtlich` | Tenant legal matter |
-| `versorger/versorger` | Utility provider communication |
+### Entity ID Reference
 
-### `rechnungen_index.csv` (incremental)
-| Column | Description |
-|---|---|
-| `id` | `INV-NNNNN` |
-| `rechnungsnr` | Invoice number (e.g., `INV-2026-0195`) |
-| `datum` | Invoice date |
-| `dienstleister_id` | Links to `DL-XXX` |
-| `dienstleister_firma` | Provider name |
-| `empfaenger` | Recipient (property manager) |
-| `netto` / `mwst` / `brutto` | Net, VAT, gross amounts (€) |
-| `iban` | Provider IBAN to pay |
-| `filename` | PDF filename |
-| `month_dir` | Month directory |
+| Prefix | Entity | Range | Maps to table |
+|---|---|---|---|
+| `LIE-` | Property (Liegenschaft) | `LIE-001` | `properties` |
+| `HAUS-` | Building | `HAUS-12/14/16` | `buildings` |
+| `EH-` | Unit (Einheit) | `EH-001`…`EH-052` | `units` |
+| `EIG-` | Owner (Eigentümer) | `EIG-001`…`EIG-035` | `owners` |
+| `MIE-` | Tenant (Mieter) | `MIE-001`…`MIE-026` | `tenants` |
+| `DL-` | Service Provider | `DL-001`…`DL-016` | `service_providers` |
+| `TX-` | Bank transaction | `TX-00001`…`TX-01619` | `bank_transactions` |
+| `EMAIL-` | Email | `EMAIL-00001`…`EMAIL-06586` | `source_events` |
+| `INV-` | Invoice | `INV-00195`… | `invoices` (+ `source_events`) |
+| `LTR-` | Letter (Brief) | `LTR-0001`…`LTR-0133` | `source_events` |
+| `THR-` | Email thread (incremental) | `THR-INN-XXXX` | `source_events.thread_id` |
+| `FACT-` | Fact (generated) | `FACT-<hex>` | `facts` |
 
----
-
-## Entity ID Reference
-
-| Prefix | Entity | Range |
-|---|---|---|
-| `LIE-` | Property (Liegenschaft) | `LIE-001` |
-| `HAUS-` | Building | `HAUS-12`, `HAUS-14`, `HAUS-16` |
-| `EH-` | Unit (Einheit) | `EH-001` … `EH-052` |
-| `EIG-` | Owner (Eigentümer) | `EIG-001` … `EIG-035` |
-| `MIE-` | Tenant (Mieter) | `MIE-001` … `MIE-026` |
-| `DL-` | Service Provider (Dienstleister) | `DL-001` … `DL-016` |
-| `TX-` | Bank transaction | `TX-00001` … `TX-01619` |
-| `EMAIL-` | Email | `EMAIL-00001` … `EMAIL-06586` |
-| `INV-` | Invoice | `INV-00195` … |
-| `LTR-` | Letter (Brief) | `LTR-0001` … `LTR-0133` |
-| `THR-` | Email thread (incremental) | `THR-INN-XXXX` |
-
----
-
-## Data Timeline
+### Data timeline
 
 ```
 Jan 2024                                        Jan 2026
@@ -287,19 +410,28 @@ Jan 2024                                        Jan 2026
                                             |-- 10 incremental days -->
 ```
 
-- **Archive** covers 2 years of operational history to seed the initial context file.
-- **Incremental** simulates day-by-day incoming data to test surgical context updates.
+---
+
+## Design Notes for the Challenge
+
+1. **Identity aliasing**: An owner appears as `eigentuemer` in `stammdaten.json`,
+   `EIG-XXX` in CSVs, and by email address in `.eml` files. Resolved at ingestion time
+   to the canonical `owner_id`.
+2. **Signal vs. noise**: 90% of emails are routine. Only ones that change facts
+   produce `facts` rows. Routine ones still get `source_events` rows for audit, but
+   no fact is extracted.
+3. **Surgical patching**: New information triggers one `INSERT` + one column
+   `UPDATE` on the supersession chain — never a full file rewrite.
+4. **Multi-language**: Owners, tenants, and providers carry a `language` field
+   (`de`/`en`); responses can be drafted in the right language without re-detection.
+5. **Intentional data quality issues**: The `error_types` column in CSVs flags
+   rows with deliberately introduced inconsistencies for robustness testing.
 
 ---
 
-## Key Design Notes for the Challenge
+## Note on SQLModel quirks
 
-1. **Identity aliasing**: The same person appears as `eigentuemer` in `stammdaten.json`, `EIG-XXX` in CSVs, and by email address in `.eml` files. The engine must resolve these to the same entity.
-
-2. **Signal vs. noise**: Most emails are routine (rent payment confirmations, utility invoices). The engine must recognize which emails change facts worth storing in the context file (e.g., a new owner, an open repair ticket, a legal dispute) vs. which are noise.
-
-3. **Surgical patching**: Incremental feeds arrive one day at a time. Regenerating the full context file each time is too expensive and destroys human edits. The engine must identify the affected section(s) and patch only those.
-
-4. **Multi-language**: Some owners and tenants prefer English (`sprache: en`). Service providers from the UK are also present. The context file should handle this gracefully.
-
-5. **Intentional data quality issues**: The `error_types` column in index files flags rows with deliberately introduced inconsistencies (wrong amounts, missing references, etc.) to test robustness.
+`SQLModel(table=True)` skips Pydantic field coercion in `__init__`, so ISO date strings
+arriving over HTTP would reach the DB as strings. The CRUD factory in `app/routers/crud.py`
+runs `model.model_validate(payload)` on every create/patch to force coercion — this is
+the canonical workaround.

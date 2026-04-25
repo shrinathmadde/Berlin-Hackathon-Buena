@@ -1,0 +1,14 @@
+.venv/
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# SQLite
+*.db
+*.db-journal
+
+# OS
+.DS_Store
