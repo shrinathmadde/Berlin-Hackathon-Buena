@@ -12,3 +12,6 @@ __pycache__/
 
 # OS
 .DS_Store
+context-engine-console/node_modules/
+context-engine-console/dist/
+context-engine-console/.vite/
