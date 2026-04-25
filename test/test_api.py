@@ -1,8 +1,11 @@
 """Evaluation harness for the /api/sql endpoint.
 
-Randomly selects one supported file from each folder, extracts the text, sends
-that text through the SQL endpoint, and writes the input/output pair to
+Randomly selects one supported file from each folder, sends it through the
+`/api/sql` endpoint, and writes the input/output pair to
 `test/results/<timestamp>/` for review.
+
+CSV files are passed through as raw text so the API can load them locally.
+Other supported file types still go through the document-extraction LLM path.
 
 Run from the repo root:
 
@@ -115,9 +118,17 @@ def extract_text(path: Path) -> tuple[str, str | None]:
             text = "\n".join((page.extract_text() or "") for page in reader.pages)
         else:
             text = path.read_text(encoding="utf-8", errors="replace")
-        return text[:MAX_CHARS], None
+        return text, None
     except Exception as e:  # noqa: BLE001
         return "", f"{type(e).__name__}: {e}"
+
+
+def is_csv_path(path: Path) -> bool:
+    return path.suffix.lower() == ".csv"
+
+
+def route_label(path: Path) -> str:
+    return "local-csv-loader" if is_csv_path(path) else "llm-document-extract"
 
 
 def safe_filename(rel_path: Path) -> str:
@@ -214,15 +225,17 @@ def main() -> int:
         print(f"[{index}/{len(files)}] {rel}", flush=True)
 
         text, extraction_error = extract_text(fpath)
-        text = text[: args.max_chars]
         if extraction_error:
             manifest.append({"path": str(rel), "error": f"extraction: {extraction_error}"})
             (run_dir / f"{safe_filename(rel)}.error.txt").write_text(extraction_error)
             continue
 
+        handler = route_label(fpath)
+        payload_text = text if is_csv_path(fpath) else text[: args.max_chars]
+
         request_payload = {
             "mode": "document_extract",
-            "text": text,
+            "text": payload_text,
             "document_path": str(rel),
         }
         t0 = time.perf_counter()
@@ -241,7 +254,8 @@ def main() -> int:
         record: dict[str, object] = {
             "path": str(rel),
             "size_bytes": fpath.stat().st_size,
-            "chars_sent": len(text),
+            "handler": handler,
+            "chars_sent": len(payload_text),
             "latency_ms": elapsed_ms,
             "status_code": status_code,
         }
@@ -256,10 +270,11 @@ def main() -> int:
             record["error"] = parsed_body
             (run_dir / f"{safe_filename(rel)}.error.txt").write_text(
                 f"=== source : {rel}\n"
+                f"=== handler: {handler}\n"
                 f"=== status : {status_code}\n"
                 f"=== latency: {elapsed_ms:.2f} ms\n\n"
                 f"--- REQUEST ---\n{json.dumps(request_payload, indent=2)}\n\n"
-                f"--- INPUT TEXT ---\n{text}\n\n"
+                f"--- INPUT TEXT ---\n{payload_text}\n\n"
                 f"--- ERROR ---\n{json.dumps(parsed_body, indent=2) if not isinstance(parsed_body, str) else parsed_body}\n"
             )
             manifest.append(record)
@@ -276,10 +291,11 @@ def main() -> int:
         pretty_body = json.dumps(parsed_body, indent=2) if not isinstance(parsed_body, str) else parsed_body
         (run_dir / f"{safe_filename(rel)}.txt").write_text(
             f"=== source : {rel}\n"
+            f"=== handler: {handler}\n"
             f"=== status : {status_code}\n"
             f"=== latency: {elapsed_ms:.2f} ms\n\n"
             f"--- REQUEST ---\n{json.dumps(request_payload, indent=2)}\n\n"
-            f"--- INPUT TEXT ---\n{text}\n\n"
+            f"--- INPUT TEXT ---\n{payload_text}\n\n"
             f"--- API OUTPUT ---\n{pretty_body}\n"
         )
 
