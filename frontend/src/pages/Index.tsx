@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 const API_BASE_URL = "http://localhost:8000";
 const FILE_PREVIEW_LIMIT = 50000;
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
+  "gpt-5.5": "gemini 3.1 pro",
   "eaf2d9b9-04b9-411f-a7cd-7e202c4270cc": "qwen3 8b",
 };
 
@@ -50,6 +51,7 @@ type DocumentProcessResult = {
   model: string;
   row_count: number;
   execution_ms: number;
+  latency_ms?: number;
   raw_model_output?: string | null;
   extraction?: {
     summary: string;
@@ -74,10 +76,33 @@ type DocumentProcessResult = {
   latencyMs: number;
 };
 
+type DocumentProcessApiResult = Omit<DocumentProcessResult, "latencyMs">;
+
 function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) return "null";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return fallback;
+}
+
+function getModelSpecificLatencyMs(
+  result: DocumentProcessApiResult,
+  requestLatencyMs: number,
+): number {
+  const resultModel = formatModelName(result.model).toLowerCase();
+  const matchingComparison = result.comparisons?.find((comparison) => {
+    const comparisonModel = formatModelName(comparison.model || comparison.label).toLowerCase();
+    const comparisonLabel = formatModelName(comparison.label).toLowerCase();
+
+    return comparisonModel === resultModel || comparisonLabel === resultModel;
+  });
+
+  return matchingComparison?.latency_ms ?? result.latency_ms ?? requestLatencyMs;
 }
 
 const SQL_LINE_KEYWORDS = [
@@ -311,13 +336,13 @@ async function processFile(file: File): Promise<DocumentProcessResult> {
   if (!res.ok) {
     throw parseApiError(res.status, res.statusText, bodyText);
   }
-  let parsed: Omit<DocumentProcessResult, "latencyMs">;
+  let parsed: DocumentProcessApiResult;
   try {
     parsed = JSON.parse(bodyText);
   } catch {
     throw new Error(`Invalid JSON response: ${bodyText.slice(0, 300)}`);
   }
-  return { ...parsed, latencyMs: t1 - t0 };
+  return { ...parsed, latencyMs: getModelSpecificLatencyMs(parsed, t1 - t0) };
 }
 
 const Index = () => {
@@ -347,8 +372,8 @@ const Index = () => {
     try {
       const r = await processFile(selectedFile);
       setFileResult(r);
-    } catch (err: any) {
-      setFileError(err?.message || String(err));
+    } catch (err: unknown) {
+      setFileError(getErrorMessage(err, String(err)));
     } finally {
       setFileLoading(false);
     }
@@ -370,8 +395,8 @@ const Index = () => {
         ? `\n\n[Preview truncated after ${FILE_PREVIEW_LIMIT} characters]`
         : "";
       setFilePreview(`${text.slice(0, FILE_PREVIEW_LIMIT)}${suffix}`);
-    } catch (err: any) {
-      setFilePreviewError(err?.message || "Could not read file content.");
+    } catch (err: unknown) {
+      setFilePreviewError(getErrorMessage(err, "Could not read file content."));
     } finally {
       setFilePreviewLoading(false);
     }
@@ -384,8 +409,8 @@ const Index = () => {
     try {
       const r = await askPropertyQuestion(question);
       setResult(r);
-    } catch (err: any) {
-      setQuestionError(err?.message || String(err));
+    } catch (err: unknown) {
+      setQuestionError(getErrorMessage(err, String(err)));
     } finally {
       setQuestionLoading(false);
     }

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import date, datetime
 from functools import lru_cache
 from io import BytesIO, StringIO
 from pathlib import PurePosixPath
@@ -16,7 +17,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.database import get_session
 from app.llm import LLMError, LLMProvider, get_gpt_provider, get_qwen_provider
@@ -242,11 +243,36 @@ def _document_ingest_system_prompt() -> str:
         "Use only the database tables and columns listed below.\n"
         "Create records only when the document clearly supports them.\n"
         "For email/letter/unstructured communication, prefer a source_events record and facts records.\n"
+        "For email replies, extract material facts from both the latest reply and quoted prior messages; "
+        "do not drop quoted repair requests, costs, approvals, appointments, or dates just because they are quoted.\n"
         "For invoices, prefer invoices plus source_events when provenance is useful.\n"
         "For bank CSV rows or statements, prefer bank_transactions.\n"
         "For master data files, use owners, tenants, units, buildings, properties, or service_providers as needed.\n"
+        "Extract each distinct business fact as its own facts record. Do not collapse a termination, handover, "
+        "repair request, repair date, and repair cost into one generic fact.\n"
         "Do not invent unsupported columns.\n"
         "Do not emit fields that are not present in the document unless they are obvious defaults.\n"
+        "facts.entity_type MUST be exactly one of: owner, tenant, unit, building, service_provider, property. "
+        "Do not invent values like 'person' or 'repair'.\n"
+        "facts.entity_id MUST be a business ID — EIG-XXX (owner), MIE-XXX (tenant), EH-XXX (unit), "
+        "HAUS-XXX (building), DL-XXX (service_provider), LIE-XXX (property). "
+        "If the document only identifies the entity by email address, emit that email as entity_id and the server "
+        "will resolve it. Do not invent IDs.\n"
+        "Whenever the document mentions a tenant, owner, or service_provider — even by name + email only — also "
+        "emit an upsert into the matching master-data table (tenants / owners / service_providers) carrying every "
+        "field the document supplies (first_name, last_name, email, phone, company, etc.). If you do not know the "
+        "business primary key (tenant_id / owner_id / provider_id) but you have an email, omit the primary key "
+        "field entirely; the server will resolve it via email or synthesize a stable ID. Never invent a primary "
+        "key value.\n"
+        "For lease terminations / Kündigungen, emit a fact with entity_type='tenant' and category='termination', "
+        "and write the termination date in the statement using DD.MM.YYYY or ISO form so it can be promoted to "
+        "tenants.lease_end.\n"
+        "For handover / Wohnungsuebergabe / Wohnungsübergabe details, emit a separate fact with "
+        "entity_type='tenant' and category='handover' when a tenant is identified.\n"
+        "For repair addenda / Nachtrag Reparatur / additional parts or costs, emit separate facts with "
+        "category='repair_request' or category='repair_cost_estimate'. If no unit, provider, or tenant business "
+        "ID is known, use entity_type='property' and entity_id='LIE-001'. Include exact dates and amounts from "
+        "the document, preserving comma decimal amounts such as 3180,62 EUR in the statement.\n"
         "When a property id is needed and the document is clearly about the seeded property, use 'LIE-001'.\n"
         "Use ISO dates and datetimes where possible.\n"
         "Use exact table names from the schema.\n\n"
@@ -482,6 +508,162 @@ def _primary_key_name(model: type[Any]) -> str:
     raise RuntimeError(f"No primary key found for {model.__name__}")
 
 
+_TERMINATION_CATEGORIES = {
+    "termination",
+    "lease_termination",
+    "lease_end",
+    "kuendigung",
+    "kündigung",
+}
+_GERMAN_DATE_RE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
+
+# Person-like entity types that have a master table keyed by email.
+_PERSON_TABLE = {
+    "tenant": "tenants",
+    "owner": "owners",
+    "service_provider": "service_providers",
+}
+_PERSON_PK = {
+    "tenants": "tenant_id",
+    "owners": "owner_id",
+    "service_providers": "provider_id",
+}
+_PERSON_ID_PREFIX = {
+    "tenants": "MIE-AUTO",
+    "owners": "EIG-AUTO",
+    "service_providers": "DL-AUTO",
+}
+_PERSON_MODEL = {
+    "tenants": Tenant,
+    "owners": Owner,
+    "service_providers": ServiceProvider,
+}
+_TABLE_TO_ENTITY_TYPE = {table: entity for entity, table in _PERSON_TABLE.items()}
+
+
+def _parse_german_date(text: str | None) -> date | None:
+    if not text:
+        return None
+    match = _GERMAN_DATE_RE.search(text)
+    if match is None:
+        return None
+    day, month, year = (int(part) for part in match.groups())
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _synthetic_business_id(table: str, email: str) -> str:
+    """Stable per-email ID. Same email always yields the same ID, so re-extraction is idempotent."""
+    digest = hashlib.sha1(email.lower().encode("utf-8")).hexdigest()[:8].upper()
+    return f"{_PERSON_ID_PREFIX[table]}-{digest}"
+
+
+def _lookup_business_id_by_email(table: str, email: str, session: Session) -> str | None:
+    if table == "tenants":
+        return session.exec(select(Tenant.tenant_id).where(Tenant.email == email)).first()
+    if table == "owners":
+        return session.exec(select(Owner.owner_id).where(Owner.email == email)).first()
+    if table == "service_providers":
+        return session.exec(
+            select(ServiceProvider.provider_id).where(ServiceProvider.email == email)
+        ).first()
+    return None
+
+
+def _seed_synthetic_master(table: str, business_id: str, email: str) -> dict[str, Any]:
+    """Minimal record to satisfy NOT NULL columns on the master table."""
+    record: dict[str, Any] = {_PERSON_PK[table]: business_id, "email": email}
+    if table == "service_providers":
+        # ServiceProvider.company is NOT NULL — derive a placeholder from the email domain.
+        domain = email.split("@", 1)[1] if "@" in email else email
+        record["company"] = domain or "(unbekannt)"
+    return record
+
+
+def _normalize_extraction(extraction: "DocumentExtraction", session: Session) -> None:
+    """Resolve emails to business IDs, synthesize master rows on miss, and promote termination facts."""
+    # Pass 1: master-data ops (tenants/owners/service_providers). Fill missing PK from email.
+    for op in extraction.records:
+        if op.table not in _PERSON_PK:
+            continue
+        pk = _PERSON_PK[op.table]
+        record = op.record
+        if record.get(pk):
+            continue
+        email = record.get("email")
+        if not isinstance(email, str) or "@" not in email:
+            continue
+        normalized_email = email.strip().lower()
+        record["email"] = normalized_email
+        resolved = _lookup_business_id_by_email(op.table, normalized_email, session)
+        record[pk] = resolved or _synthetic_business_id(op.table, normalized_email)
+
+    # Index master-data ops already in the extraction so we can merge into them.
+    master_index: dict[tuple[str, str], dict[str, Any]] = {}
+    for op in extraction.records:
+        if op.table not in _PERSON_PK:
+            continue
+        pk_value = op.record.get(_PERSON_PK[op.table])
+        if isinstance(pk_value, str):
+            master_index[(op.table, pk_value)] = op.record
+
+    # Pass 2: resolve fact entity_ids (email -> existing or synthetic business ID).
+    new_masters: dict[tuple[str, str], dict[str, Any]] = {}
+    for op in extraction.records:
+        if op.table != "facts":
+            continue
+        record = op.record
+        entity_type = record.get("entity_type")
+        entity_id = record.get("entity_id")
+        if not (isinstance(entity_type, str) and isinstance(entity_id, str)):
+            continue
+        if "@" not in entity_id:
+            continue
+        table = _PERSON_TABLE.get(entity_type)
+        if table is None:
+            continue
+        email = entity_id.strip().lower()
+        resolved = _lookup_business_id_by_email(table, email, session)
+        if resolved is None:
+            resolved = _synthetic_business_id(table, email)
+            key = (table, resolved)
+            if key not in master_index and key not in new_masters:
+                new_masters[key] = _seed_synthetic_master(table, resolved, email)
+            elif key in master_index:
+                master_index[key].setdefault("email", email)
+        record["entity_id"] = resolved
+
+    # Pass 3: promote termination facts to tenants.lease_end on the matching tenant row.
+    for op in extraction.records:
+        if op.table != "facts":
+            continue
+        record = op.record
+        if record.get("entity_type") != "tenant":
+            continue
+        category = (record.get("category") or "").strip().lower()
+        if category not in _TERMINATION_CATEGORIES:
+            continue
+        tenant_id = record.get("entity_id")
+        if not isinstance(tenant_id, str) or not tenant_id.startswith("MIE-"):
+            continue
+        parsed = _parse_german_date(record.get("statement"))
+        if parsed is None:
+            continue
+        lease_end_iso = parsed.isoformat()
+        key = ("tenants", tenant_id)
+        if key in master_index:
+            master_index[key]["lease_end"] = lease_end_iso
+        elif key in new_masters:
+            new_masters[key]["lease_end"] = lease_end_iso
+        elif session.get(Tenant, tenant_id) is not None:
+            new_masters[key] = {"tenant_id": tenant_id, "lease_end": lease_end_iso}
+
+    for (table, _pk_value), record in new_masters.items():
+        extraction.records.append(ExtractOperation(table=table, record=record))
+
+
 def _upsert_extraction(
     extraction: "DocumentExtraction",
     session: Session,
@@ -489,6 +671,7 @@ def _upsert_extraction(
     document_path: str | None,
     document_text: str | None,
 ) -> list["WriteRecord"]:
+    _normalize_extraction(extraction, session)
     writes: list[WriteRecord] = []
     for operation in extraction.records:
         model = TABLE_TO_MODEL[operation.table]
@@ -508,7 +691,7 @@ def _upsert_extraction(
             session.add(obj)
             status = "created"
         else:
-            for key, value in obj.model_dump(exclude_unset=False).items():
+            for key, value in obj.model_dump(exclude_unset=True).items():
                 if key != pk_name:
                     setattr(existing, key, value)
             session.add(existing)
