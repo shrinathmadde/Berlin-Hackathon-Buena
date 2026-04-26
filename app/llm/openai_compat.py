@@ -6,15 +6,9 @@ OpenAI, OpenRouter, Groq, Together, Anyscale, vLLM, LM Studio, Ollama
 """
 from __future__ import annotations
 
-import time
-
 import httpx
 
 from app.llm.base import LLMError, LLMProvider
-
-_MAX_RETRIES = 8
-_BACKOFF_BASE = 2.0
-_BACKOFF_CAP = 120.0
 
 
 class OpenAICompatibleProvider(LLMProvider):
@@ -24,7 +18,7 @@ class OpenAICompatibleProvider(LLMProvider):
         api_key: str,
         base_url: str,
         model: str,
-        timeout: float = 60.0,
+        timeout: float = 100.0,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -47,6 +41,15 @@ class OpenAICompatibleProvider(LLMProvider):
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
+        return self.complete_messages(messages, max_tokens=max_tokens, temperature=temperature)
+
+    def complete_messages(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        max_tokens: int = 4096,
+        temperature: float = 0.2,
+    ) -> str:
         payload = {
             "model": self._model,
             "messages": messages,
@@ -56,32 +59,23 @@ class OpenAICompatibleProvider(LLMProvider):
         else:
             payload["max_tokens"] = max_tokens
             payload["temperature"] = temperature
-        last_error: LLMError | None = None
-        for attempt in range(_MAX_RETRIES + 1):
-            try:
-                with httpx.Client(timeout=self._timeout) as client:
-                    r = client.post(
-                        f"{self._base_url}/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {self._api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        json=payload,
-                    )
-                if r.status_code == 429:
-                    retry_after = float(r.headers.get("Retry-After", 0))
-                    wait = max(retry_after, min(_BACKOFF_CAP, _BACKOFF_BASE ** attempt))
-                    last_error = LLMError(f"{r.status_code}: {r.text[:500]}")
-                    if attempt < _MAX_RETRIES:
-                        time.sleep(wait)
-                        continue
-                    raise last_error
-                if r.status_code >= 400:
-                    raise LLMError(f"{r.status_code}: {r.text[:500]}")
-                data = r.json()
-                return data["choices"][0]["message"]["content"]
-            except httpx.HTTPError as e:
-                raise LLMError(f"transport: {type(e).__name__}: {e}") from e
-            except (KeyError, IndexError, ValueError) as e:
-                raise LLMError(f"unexpected response shape: {e}") from e
-        raise last_error  # type: ignore[misc]
+        try:
+            with httpx.Client(timeout=self._timeout) as client:
+                r = client.post(
+                    f"{self._base_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self._api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+            if r.status_code >= 400:
+                raise LLMError(f"{self._model} failed with HTTP {r.status_code}: {r.text[:500]}")
+            data = r.json()
+            return data["choices"][0]["message"]["content"]
+        except httpx.TimeoutException as e:
+            raise LLMError(f"{self._model} timed out after {self._timeout:g}s") from e
+        except httpx.HTTPError as e:
+            raise LLMError(f"{self._model} transport error: {type(e).__name__}: {e}") from e
+        except (KeyError, IndexError, ValueError) as e:
+            raise LLMError(f"{self._model} returned an unexpected response shape: {e}") from e

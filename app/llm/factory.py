@@ -38,6 +38,16 @@ def _env(name: str, default: str | None = None) -> str | None:
     return v
 
 
+def _env_float(name: str, default: float) -> float:
+    value = _env(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        raise RuntimeError(f"{name} must be a number, got {value!r}") from None
+
+
 def _openai_compatible_provider_from_env(
     *,
     label: str,
@@ -55,6 +65,7 @@ def _openai_compatible_provider_from_env(
         api_key=api_key,
         base_url=_env(base_url_name, default_base_url) or default_base_url,
         model=_env(model_name, default_model) or default_model,
+        timeout=_env_float("LLM_TIMEOUT_SECONDS", 100.0),
     )
 
 
@@ -102,6 +113,7 @@ def get_llm_provider() -> LLMProvider:
             api_key=api_key or "ollama",
             base_url=base_url or "https://api.openai.com/v1",
             model=model or "gpt-5.5",
+            timeout=_env_float("LLM_TIMEOUT_SECONDS", 100.0),
         )
 
     if provider == "pioneer":
@@ -114,6 +126,7 @@ def get_llm_provider() -> LLMProvider:
             api_key=api_key,
             base_url=base_url or "https://api.pioneer.ai/v1",
             model=model or "eaf2d9b9-04b9-411f-a7cd-7e202c4270cc",
+            timeout=_env_float("LLM_TIMEOUT_SECONDS", 100.0),
         )
 
     if provider == "gemini":
@@ -130,6 +143,7 @@ def get_llm_provider() -> LLMProvider:
             api_key=api_key,
             base_url=base_url or "https://generativelanguage.googleapis.com/v1beta/openai",
             model=model or "gemini-2.5-flash-lite",
+            timeout=_env_float("LLM_TIMEOUT_SECONDS", 100.0),
         )
 
     if provider == "anthropic":
@@ -137,7 +151,11 @@ def get_llm_provider() -> LLMProvider:
         model = _env("LLM_MODEL", "claude-sonnet-4-6")
         if not api_key:
             raise RuntimeError("LLM_API_KEY is required when LLM_PROVIDER='anthropic'")
-        return AnthropicProvider(api_key=api_key, model=model or "claude-sonnet-4-6")
+        return AnthropicProvider(
+            api_key=api_key,
+            model=model or "claude-sonnet-4-6",
+            timeout=_env_float("LLM_TIMEOUT_SECONDS", 100.0),
+        )
 
     raise RuntimeError(
         f"Unknown LLM_PROVIDER: {provider!r}. "

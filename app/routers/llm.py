@@ -217,6 +217,22 @@ def _sql_query_system_prompt() -> str:
 
 
 @lru_cache(maxsize=1)
+def _agent_system_prompt() -> str:
+    return (
+        "You answer questions about a German property-management database by running SQL.\n"
+        "On every turn, output exactly one JSON object — no prose, no markdown fences:\n"
+        '  {"tool": "run_sql", "sql": "SELECT ..."}\n'
+        '  {"tool": "final", "answer": "natural-language answer for the user"}\n'
+        "Rules:\n"
+        "- SELECT only. Writes are rejected.\n"
+        "- Add LIMIT 50 unless you are aggregating.\n"
+        "- After 1-3 SELECTs you should have enough; emit \"final\" then.\n"
+        "- The final answer must be plain prose grounded in observed rows.\n\n"
+        f"SCHEMA:\n{_schema_summary()}"
+    )
+
+
+@lru_cache(maxsize=1)
 def _document_ingest_system_prompt() -> str:
     schema = DocumentExtraction.model_json_schema()
     return (
@@ -539,6 +555,7 @@ class SQLRequest(BaseModel):
 class AskRequest(BaseModel):
     question: str | None = Field(default=None, description="Natural-language property question")
     query: str | None = Field(default=None, description="Alias for question")
+    agentic: bool = Field(default=False, description="Run a bounded ReAct loop instead of one-shot SQL")
 
 
 class ExtractOperation(BaseModel):
@@ -572,6 +589,7 @@ class ModelExtractionResult(BaseModel):
     label: str
     model: str | None = None
     latency_ms: float
+    raw_model_output: str | None = None
     extraction: DocumentExtraction | None = None
     error: str | None = None
 
@@ -588,6 +606,9 @@ class SQLResponse(BaseModel):
     extraction: DocumentExtraction | None = None
     writes: list[WriteRecord] = Field(default_factory=list)
     comparisons: list[ModelExtractionResult] = Field(default_factory=list)
+    raw_model_output: str | None = None
+    answer: str | None = None
+    agent_steps: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def _extract_file_text(filename: str | None, content: bytes) -> str:
@@ -611,20 +632,20 @@ def _extract_document_with_provider(
     text: str,
     document_path: str | None,
     provider: LLMProvider,
-) -> DocumentExtraction:
+) -> tuple[DocumentExtraction, str]:
     raw_json = provider.complete(
         _document_ingest_user_prompt(text, document_path),
         system=_document_ingest_system_prompt(),
+        max_tokens=8192,
         temperature=0,
     )
     json_text = _extract_json_text(raw_json)
     if not json_text:
         raise ValueError("LLM returned empty JSON")
-    return DocumentExtraction.model_validate_json(json_text)
+    return DocumentExtraction.model_validate_json(json_text), raw_json
 
 
 def _comparison_extraction(
-    label: str,
     provider_factory: Any,
     text: str,
     document_path: str | None,
@@ -633,16 +654,17 @@ def _comparison_extraction(
     provider: LLMProvider | None = None
     try:
         provider = provider_factory()
-        extraction = _extract_document_with_provider(text, document_path, provider)
+        extraction, raw_model_output = _extract_document_with_provider(text, document_path, provider)
         return ModelExtractionResult(
-            label=label,
+            label=provider.model_name,
             model=provider.model_name,
             latency_ms=round((perf_counter() - started_at) * 1000, 2),
+            raw_model_output=raw_model_output,
             extraction=extraction,
         )
     except Exception as e:
         return ModelExtractionResult(
-            label=label,
+            label=provider.model_name if provider else "unavailable",
             model=provider.model_name if provider else None,
             latency_ms=round((perf_counter() - started_at) * 1000, 2),
             error=str(e),
@@ -651,18 +673,18 @@ def _comparison_extraction(
 
 def _extract_comparison_results(text: str, document_path: str | None) -> list[ModelExtractionResult]:
     jobs = [
-        ("GPT-5.5", get_gpt_provider),
-        ("Qwen", get_qwen_provider),
+        get_gpt_provider,
+        get_qwen_provider,
     ]
-    results: list[ModelExtractionResult] = []
+    results: list[ModelExtractionResult | None] = [None] * len(jobs)
     with ThreadPoolExecutor(max_workers=len(jobs)) as executor:
-        futures = [
-            executor.submit(_comparison_extraction, label, provider_factory, text, document_path)
-            for label, provider_factory in jobs
-        ]
+        futures = {
+            executor.submit(_comparison_extraction, provider_factory, text, document_path): index
+            for index, provider_factory in enumerate(jobs)
+        }
         for future in as_completed(futures):
-            results.append(future.result())
-    return sorted(results, key=lambda result: 0 if result.label == "GPT-5.5" else 1)
+            results[futures[future]] = future.result()
+    return [result for result in results if result is not None]
 
 
 def _process_document_text(
@@ -694,17 +716,18 @@ def _process_document_text(
             returns_rows=False,
             row_count=len(writes),
             execution_ms=execution_ms,
+            raw_model_output=extraction.model_dump_json(indent=2),
             extraction=extraction,
             writes=writes,
         )
 
     comparisons = _extract_comparison_results(text, document_path)
-    gpt_result = next((result for result in comparisons if result.label == "GPT-5.5"), None)
-    if gpt_result is None or gpt_result.extraction is None:
-        error = gpt_result.error if gpt_result else "GPT-5.5 comparison result was not returned"
-        raise HTTPException(502, f"GPT-5.5 extraction failed: {error}")
+    primary_result = comparisons[0] if comparisons else None
+    if primary_result is None or primary_result.extraction is None:
+        error = primary_result.error if primary_result else "primary comparison result was not returned"
+        raise HTTPException(502, f"Primary extraction failed: {error}")
 
-    extraction = gpt_result.extraction
+    extraction = primary_result.extraction
 
     started_at = perf_counter()
     try:
@@ -721,10 +744,11 @@ def _process_document_text(
     execution_ms = round((perf_counter() - started_at) * 1000, 2)
     return SQLResponse(
         mode="document_extract",
-        model=gpt_result.model or "gpt-5.5",
+        model=primary_result.model or "unknown",
         returns_rows=False,
         row_count=len(writes),
         execution_ms=execution_ms,
+        raw_model_output=primary_result.raw_model_output,
         extraction=extraction,
         writes=writes,
         comparisons=comparisons,
@@ -795,6 +819,111 @@ def _run_question_as_sql(question: str | None, session: Session) -> SQLResponse:
         raise HTTPException(400, detail={"sql": sql, "error": str(e)}) from e
 
 
+_AGENT_MAX_STEPS = 6
+_AGENT_MAX_ROWS_FETCHED = 200
+_AGENT_MAX_OBSERVATION_ROWS = 50
+
+
+def _exec_agent_select(session: Session, sql: str) -> list[dict[str, Any]]:
+    if _is_write_sql(sql):
+        raise ValueError("only SELECT permitted in agent mode")
+    result = session.connection().exec_driver_sql(sql)
+    if not result.returns_rows:
+        return []
+    return [dict(row) for row in result.mappings().fetchmany(_AGENT_MAX_ROWS_FETCHED)]
+
+
+def _parse_agent_action(raw: str) -> dict[str, Any]:
+    text = _extract_json_text(raw)
+    if not text:
+        raise ValueError("empty response")
+    return json.loads(text)
+
+
+def _run_question_agentic(question: str | None, session: Session) -> SQLResponse:
+    if not question or not question.strip():
+        raise HTTPException(422, "question is required")
+
+    try:
+        provider = get_gpt_provider()
+    except RuntimeError as e:
+        raise HTTPException(502, f"LLM call failed: {e}") from e
+
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": _agent_system_prompt()},
+        {"role": "user", "content": question},
+    ]
+    steps: list[dict[str, Any]] = []
+    started_at = perf_counter()
+
+    for _ in range(_AGENT_MAX_STEPS):
+        try:
+            raw = provider.complete_messages(messages, temperature=0)
+        except LLMError as e:
+            raise HTTPException(502, f"LLM call failed: {e}") from e
+
+        try:
+            action = _parse_agent_action(raw)
+        except (ValueError, json.JSONDecodeError):
+            messages.append({"role": "assistant", "content": raw})
+            messages.append(
+                {"role": "user", "content": "ERROR: response was not valid JSON. Emit one JSON object only."}
+            )
+            steps.append({"raw": raw[:500], "error": "invalid_json"})
+            continue
+
+        tool = action.get("tool")
+
+        if tool == "final":
+            answer = str(action.get("answer", "")).strip()
+            execution_ms = round((perf_counter() - started_at) * 1000, 2)
+            last_with_rows = next(
+                (s for s in reversed(steps) if isinstance(s.get("rows"), list) and s.get("rows")),
+                None,
+            )
+            return SQLResponse(
+                mode="query",
+                model=provider.model_name,
+                returns_rows=bool(last_with_rows),
+                row_count=sum(len(s.get("rows", [])) for s in steps if isinstance(s.get("rows"), list)),
+                execution_ms=execution_ms,
+                sql=steps[-1].get("sql") if steps else None,
+                statement_count=sum(1 for s in steps if "sql" in s and "error" not in s),
+                rows=jsonable_encoder((last_with_rows or {}).get("rows", [])),
+                answer=answer,
+                agent_steps=jsonable_encoder(steps),
+            )
+
+        if tool == "run_sql":
+            sql = _strip_sql_fences(str(action.get("sql", "")))
+            if not sql:
+                steps.append({"sql": "", "error": "empty"})
+                obs = "ERROR: empty sql"
+            else:
+                try:
+                    rows = _exec_agent_select(session, sql)
+                    steps.append({"sql": sql, "rows": rows})
+                    truncated = rows[:_AGENT_MAX_OBSERVATION_ROWS]
+                    obs = json.dumps(jsonable_encoder(truncated), default=str)
+                    if len(rows) > _AGENT_MAX_OBSERVATION_ROWS:
+                        obs += f"\n... ({len(rows) - _AGENT_MAX_OBSERVATION_ROWS} more rows truncated)"
+                except (SQLAlchemyError, ValueError) as e:
+                    session.rollback()
+                    steps.append({"sql": sql, "error": str(e)})
+                    obs = f"SQL ERROR: {e}"
+            messages.append({"role": "assistant", "content": raw})
+            messages.append({"role": "user", "content": f"OBSERVATION:\n{obs}"})
+            continue
+
+        messages.append({"role": "assistant", "content": raw})
+        messages.append(
+            {"role": "user", "content": f"ERROR: unknown tool {tool!r}. Use 'run_sql' or 'final'."}
+        )
+        steps.append({"raw": raw[:500], "error": f"unknown_tool:{tool}"})
+
+    raise HTTPException(504, detail={"error": "agent exceeded step budget", "steps": jsonable_encoder(steps)})
+
+
 @router.post("/process-file", response_model=SQLResponse)
 async def process_file(
     file: UploadFile = File(...),
@@ -810,7 +939,10 @@ def ask_property_question(
     payload: AskRequest,
     session: Session = Depends(get_session),
 ) -> SQLResponse:
-    return _run_question_as_sql(payload.question or payload.query, session)
+    question = payload.question or payload.query
+    if payload.agentic:
+        return _run_question_agentic(question, session)
+    return _run_question_as_sql(question, session)
 
 
 @router.post("/sql", response_model=SQLResponse)

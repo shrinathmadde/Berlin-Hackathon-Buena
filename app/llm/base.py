@@ -35,3 +35,20 @@ class LLMProvider(ABC):
         max_tokens: int = 4096,
         temperature: float = 0.2,
     ) -> str: ...
+
+    def complete_messages(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        max_tokens: int = 4096,
+        temperature: float = 0.2,
+    ) -> str:
+        # Default: flatten to a single prompt so providers without native chat
+        # support still work. OpenAI-compatible providers override for fidelity.
+        system = next((m["content"] for m in messages if m["role"] == "system"), None)
+        body = "\n\n".join(
+            f"{m['role'].upper()}: {m['content']}"
+            for m in messages
+            if m["role"] != "system"
+        )
+        return self.complete(body, system=system, max_tokens=max_tokens, temperature=temperature)

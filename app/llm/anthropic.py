@@ -13,7 +13,7 @@ class AnthropicProvider(LLMProvider):
         api_key: str,
         model: str,
         base_url: str = "https://api.anthropic.com",
-        timeout: float = 60.0,
+        timeout: float = 100.0,
     ) -> None:
         self._api_key = api_key
         self._model = model
@@ -59,7 +59,9 @@ class AnthropicProvider(LLMProvider):
                 for block in data.get("content", [])
                 if block.get("type") == "text"
             )
+        except httpx.TimeoutException as e:
+            raise LLMError(f"{self._model} timed out after {self._timeout:g}s") from e
         except httpx.HTTPError as e:
-            raise LLMError(f"transport: {type(e).__name__}: {e}") from e
+            raise LLMError(f"{self._model} transport error: {type(e).__name__}: {e}") from e
         except (KeyError, ValueError) as e:
             raise LLMError(f"unexpected response shape: {e}") from e

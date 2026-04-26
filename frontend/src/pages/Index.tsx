@@ -5,6 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 
 const API_BASE_URL = "http://localhost:8000";
+const FILE_PREVIEW_LIMIT = 50000;
+const MODEL_DISPLAY_NAMES: Record<string, string> = {
+  "eaf2d9b9-04b9-411f-a7cd-7e202c4270cc": "qwen3 8b",
+};
 
 // ---------- Latency helpers ----------
 function formatLatency(ms: number): string {
@@ -21,6 +25,11 @@ function LatencyPill({ ms }: { ms: number }) {
       {formatLatency(ms)}
     </span>
   );
+}
+
+function formatModelName(model?: string | null): string {
+  if (!model) return "";
+  return MODEL_DISPLAY_NAMES[model] ?? model;
 }
 
 type SqlRow = Record<string, unknown>;
@@ -41,6 +50,7 @@ type DocumentProcessResult = {
   model: string;
   row_count: number;
   execution_ms: number;
+  raw_model_output?: string | null;
   extraction?: {
     summary: string;
     records: ExtractOperation[];
@@ -54,6 +64,7 @@ type DocumentProcessResult = {
     label: string;
     model?: string | null;
     latency_ms: number;
+    raw_model_output?: string | null;
     extraction?: {
       summary: string;
       records: ExtractOperation[];
@@ -67,6 +78,133 @@ function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) return "null";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+const SQL_LINE_KEYWORDS = [
+  "LEFT JOIN",
+  "RIGHT JOIN",
+  "INNER JOIN",
+  "FULL JOIN",
+  "OUTER JOIN",
+  "GROUP BY",
+  "ORDER BY",
+  "SELECT",
+  "INSERT",
+  "UPDATE",
+  "DELETE",
+  "FROM",
+  "WHERE",
+  "HAVING",
+  "VALUES",
+  "RETURNING",
+  "LIMIT",
+  "OFFSET",
+  "UNION",
+  "JOIN",
+  "SET",
+  "AND",
+  "OR",
+];
+
+function isSqlIdentifierChar(char: string | undefined): boolean {
+  return !!char && /[A-Z0-9_]/.test(char.toUpperCase());
+}
+
+function matchesSqlKeyword(text: string, index: number, keyword: string): boolean {
+  const before = text[index - 1];
+  const after = text[index + keyword.length];
+
+  return (
+    text.slice(index, index + keyword.length).toUpperCase() === keyword &&
+    !isSqlIdentifierChar(before) &&
+    !isSqlIdentifierChar(after)
+  );
+}
+
+function normalizeSqlWhitespace(sql: string): string {
+  let formatted = "";
+  let inString = false;
+  let pendingSpace = false;
+
+  for (let index = 0; index < sql.length; index += 1) {
+    const char = sql[index];
+    const next = sql[index + 1];
+
+    if (char === "'") {
+      if (pendingSpace && formatted) formatted += " ";
+      pendingSpace = false;
+      formatted += char;
+
+      if (inString && next === "'") {
+        formatted += next;
+        index += 1;
+      } else {
+        inString = !inString;
+      }
+      continue;
+    }
+
+    if (!inString && /\s/.test(char)) {
+      pendingSpace = true;
+      continue;
+    }
+
+    if (pendingSpace && formatted && !formatted.endsWith("(")) {
+      formatted += " ";
+    }
+    pendingSpace = false;
+    formatted += char;
+  }
+
+  return formatted.trim();
+}
+
+function formatSqlQuery(sql: string): string {
+  const normalizedSql = normalizeSqlWhitespace(sql);
+  let formatted = "";
+  let inString = false;
+
+  for (let index = 0; index < normalizedSql.length; index += 1) {
+    const char = normalizedSql[index];
+    const next = normalizedSql[index + 1];
+
+    if (char === "'") {
+      formatted += char;
+      if (inString && next === "'") {
+        formatted += next;
+        index += 1;
+      } else {
+        inString = !inString;
+      }
+      continue;
+    }
+
+    if (!inString) {
+      const keyword = SQL_LINE_KEYWORDS.find((candidate) =>
+        matchesSqlKeyword(normalizedSql, index, candidate),
+      );
+
+      if (keyword) {
+        formatted = formatted.trimEnd();
+        if (formatted) formatted += "\n";
+        formatted += keyword;
+        index += keyword.length - 1;
+        continue;
+      }
+    }
+
+    formatted += char;
+  }
+
+  return formatted
+    .split("\n")
+    .map((line) => {
+      const trimmedLine = line.trim();
+      if (/^(AND|OR)\b/i.test(trimmedLine)) return `   ${trimmedLine}`;
+      return trimmedLine;
+    })
+    .filter(Boolean)
+    .join("\n");
 }
 
 function parseApiError(status: number, statusText: string, bodyText: string): Error {
@@ -87,40 +225,55 @@ function parseApiError(status: number, statusText: string, bodyText: string): Er
   return new Error(`HTTP ${status}: ${bodyText || statusText}`);
 }
 
-function ExtractedRecordTables({ records }: { records: ExtractOperation[] }) {
-  if (!records.length) {
-    return <p className="text-sm text-muted-foreground">No extracted records were returned.</p>;
+function RawModelOutput({
+  value,
+  fallback,
+}: {
+  value?: string | null;
+  fallback?: unknown;
+}) {
+  const records = extractRecords(value) ?? extractRecords(fallback);
+  const output = records === undefined ? "" : JSON.stringify(records, null, 2);
+
+  if (!output) {
+    return <p className="text-sm text-muted-foreground">No model output was returned.</p>;
   }
 
   return (
-    <div className="space-y-3">
-      {records.map((operation, index) => (
-        <div key={`${operation.table}-${index}`} className="overflow-x-auto rounded-md border bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-muted/40">
-              <tr>
-                <th colSpan={2} className="px-3 py-2 font-medium text-slate-950">
-                  {operation.table}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(operation.record).map(([field, value]) => (
-                <tr key={field} className="border-t align-top">
-                  <td className="w-48 px-3 py-2 font-mono text-xs text-muted-foreground">
-                    {field}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {formatCellValue(value)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-    </div>
+    <pre className="max-h-[36rem] overflow-auto whitespace-pre-wrap rounded-md border bg-slate-950 p-4 text-sm text-slate-50">
+      <code>{output}</code>
+    </pre>
   );
+}
+
+function extractRecords(value: unknown): unknown[] | undefined {
+  if (!value) return undefined;
+
+  if (typeof value === "string") {
+    const text = stripJsonFence(value.trim());
+    if (!text) return undefined;
+    try {
+      return extractRecords(JSON.parse(text));
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (typeof value === "object" && "records" in value) {
+    const records = (value as { records?: unknown }).records;
+    return Array.isArray(records) ? records : undefined;
+  }
+
+  return undefined;
+}
+
+function stripJsonFence(text: string): string {
+  if (!text.startsWith("```")) return text;
+
+  const lines = text.split(/\r?\n/);
+  if (lines[0]?.startsWith("```")) lines.shift();
+  if (lines[lines.length - 1]?.trim() === "```") lines.pop();
+  return lines.join("\n").trim();
 }
 
 async function askPropertyQuestion(question: string): Promise<SqlResult> {
@@ -169,6 +322,9 @@ async function processFile(file: File): Promise<DocumentProcessResult> {
 
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [filePreviewLoading, setFilePreviewLoading] = useState(false);
+  const [filePreviewError, setFilePreviewError] = useState<string | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
   const [fileResult, setFileResult] = useState<DocumentProcessResult | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -195,6 +351,29 @@ const Index = () => {
       setFileError(err?.message || String(err));
     } finally {
       setFileLoading(false);
+    }
+  }
+
+  async function handleSelectedFileChange(file: File | null) {
+    setSelectedFile(file);
+    setFileResult(null);
+    setFileError(null);
+    setFilePreview(null);
+    setFilePreviewError(null);
+
+    if (!file) return;
+
+    setFilePreviewLoading(true);
+    try {
+      const text = await file.text();
+      const suffix = text.length > FILE_PREVIEW_LIMIT
+        ? `\n\n[Preview truncated after ${FILE_PREVIEW_LIMIT} characters]`
+        : "";
+      setFilePreview(`${text.slice(0, FILE_PREVIEW_LIMIT)}${suffix}`);
+    } catch (err: any) {
+      setFilePreviewError(err?.message || "Could not read file content.");
+    } finally {
+      setFilePreviewLoading(false);
     }
   }
 
@@ -243,9 +422,7 @@ const Index = () => {
                 type="file"
                 className="block w-full cursor-pointer rounded-md border border-input bg-background text-sm text-slate-700 file:mr-4 file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
                 onChange={(e) => {
-                  setSelectedFile(e.target.files?.[0] ?? null);
-                  setFileResult(null);
-                  setFileError(null);
+                  void handleSelectedFileChange(e.target.files?.[0] ?? null);
                 }}
               />
               <p className="text-sm text-muted-foreground">
@@ -256,6 +433,26 @@ const Index = () => {
                 {fileLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Process file
               </Button>
+
+              {(filePreviewLoading || filePreviewError || filePreview !== null) && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-950">File content</p>
+                  {filePreviewLoading ? (
+                    <div className="flex items-center gap-2 rounded-md border bg-white p-3 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Reading file...
+                    </div>
+                  ) : filePreviewError ? (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                      {filePreviewError}
+                    </div>
+                  ) : (
+                    <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md border bg-slate-950 p-4 text-xs text-slate-50">
+                      <code>{filePreview}</code>
+                    </pre>
+                  )}
+                </div>
+              )}
 
               {fileError && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
@@ -270,35 +467,14 @@ const Index = () => {
                     <span className="text-muted-foreground">
                       db execution: {formatLatency(fileResult.execution_ms)}
                     </span>
-                    <span className="text-muted-foreground">model: {fileResult.model}</span>
+                    <span className="text-muted-foreground">
+                      model: {formatModelName(fileResult.model)}
+                    </span>
                   </div>
-                  <div className="rounded-md border bg-white p-3 text-sm">
-                    <p className="font-medium text-slate-950">Writes ({fileResult.writes.length})</p>
-                    {fileResult.writes.length ? (
-                      <table className="mt-2 w-full text-left text-sm">
-                        <thead className="border-b text-xs uppercase text-muted-foreground">
-                          <tr>
-                            <th className="py-1 pr-3 font-medium">Table</th>
-                            <th className="py-1 pr-3 font-medium">Primary key</th>
-                            <th className="py-1 font-medium">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {fileResult.writes.map((write) => (
-                            <tr key={`${write.table}-${write.primary_key}`} className="border-b last:border-0">
-                              <td className="py-1.5 pr-3 font-mono text-xs">{write.table}</td>
-                              <td className="py-1.5 pr-3 font-mono text-xs">{write.primary_key}</td>
-                              <td className="py-1.5">{write.status}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <p className="mt-2 text-muted-foreground">No database writes were produced.</p>
-                    )}
-                  </div>
-                  <ExtractedRecordTables records={fileResult.extraction?.records ?? []} />
-
+                  <RawModelOutput
+                    value={fileResult.raw_model_output}
+                    fallback={fileResult.extraction}
+                  />
                 </div>
               )}
             </CardContent>
@@ -341,10 +517,12 @@ const Index = () => {
                       <span className="text-muted-foreground">
                         db execution: {formatLatency(result.execution_ms)}
                       </span>
-                      <span className="text-muted-foreground">model: {result.model}</span>
+                      <span className="text-muted-foreground">
+                        model: {formatModelName(result.model)}
+                      </span>
                     </div>
-                    <pre className="overflow-x-auto rounded-md border bg-slate-950 p-4 text-sm text-slate-50">
-                      <code>{result.sql}</code>
+                    <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md border bg-slate-950 p-4 text-sm text-slate-50">
+                      <code>{formatSqlQuery(result.sql)}</code>
                     </pre>
                   </CardContent>
                 </Card>
@@ -412,9 +590,14 @@ const Index = () => {
                 {fileResult.comparisons.map((comparison) => (
                   <div key={comparison.label} className="space-y-3 rounded-md border bg-white p-3">
                     <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="font-medium text-slate-950">{comparison.label}</span>
-                      {comparison.model && (
-                        <span className="text-muted-foreground">model: {comparison.model}</span>
+                      <span className="font-medium text-slate-950">
+                        {formatModelName(comparison.model || comparison.label)}
+                      </span>
+                      {comparison.model &&
+                        formatModelName(comparison.model) !== formatModelName(comparison.label) && (
+                        <span className="text-muted-foreground">
+                          model: {formatModelName(comparison.model)}
+                        </span>
                       )}
                       <LatencyPill ms={comparison.latency_ms} />
                     </div>
@@ -423,7 +606,10 @@ const Index = () => {
                         {comparison.error}
                       </div>
                     ) : (
-                      <ExtractedRecordTables records={comparison.extraction?.records ?? []} />
+                      <RawModelOutput
+                        value={comparison.raw_model_output}
+                        fallback={comparison.extraction}
+                      />
                     )}
                   </div>
                 ))}
