@@ -1,0 +1,90 @@
+{
+  "document_path": "rechnungen/2024-05/20240528_DL-004_INV-00038.pdf",
+  "model": "gpt-5.5-2026-04-23",
+  "system_prompt": "You extract structured records from one German property-management document.\nReturn valid JSON only. No markdown fences. No prose. No comments.\nThe JSON must match the schema exactly.\nUse only the database tables and columns listed below.\nCreate records only when the document clearly supports them.\nFor email/letter/unstructured communication, prefer a source_events record and facts records.\nFor invoices, prefer invoices plus source_events when provenance is useful.\nFor bank CSV rows or statements, prefer bank_transactions.\nFor master data files, use owners, tenants, units, buildings, properties, or service_providers as needed.\nDo not invent unsupported columns.\nDo not emit fields that are not present in the document unless they are obvious defaults.\nWhen a property id is needed and the document is clearly about the seeded property, use 'LIE-001'.\nUse ISO dates and datetimes where possible.\nUse exact table names from the schema.\n\nSCHEMA:\nproperties(property_id [VARCHAR PK REQUIRED], name [VARCHAR REQUIRED], street [VARCHAR REQUIRED], postal_code [VARCHAR REQUIRED], city [VARCHAR REQUIRED], country [VARCHAR REQUIRED], built_year [INTEGER NULLABLE], renovated_year [INTEGER NULLABLE], manager_name [VARCHAR NULLABLE], manager_street [VARCHAR NULLABLE], manager_postal_code [VARCHAR NULLABLE], manager_city [VARCHAR NULLABLE], manager_email [VARCHAR NULLABLE], manager_phone [VARCHAR NULLABLE], manager_iban [VARCHAR NULLABLE], manager_bic [VARCHAR NULLABLE], manager_bank [VARCHAR NULLABLE], manager_tax_number [VARCHAR NULLABLE], weg_account_iban [VARCHAR NULLABLE], weg_account_bic [VARCHAR NULLABLE], weg_account_bank [VARCHAR NULLABLE], reserve_account_iban [VARCHAR NULLABLE], reserve_account_bic [VARCHAR NULLABLE])\nbuildings(building_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], house_number [VARCHAR REQUIRED], units_count [INTEGER NULLABLE], floors [INTEGER NULLABLE], has_elevator [BOOLEAN REQUIRED], built_year [INTEGER NULLABLE])\nunits(unit_id [VARCHAR PK REQUIRED], building_id [VARCHAR REQUIRED FK->buildings.building_id], property_id [VARCHAR REQUIRED FK->properties.property_id], owner_id [VARCHAR NULLABLE FK->owners.owner_id], unit_number [VARCHAR REQUIRED], location [VARCHAR NULLABLE], type [VARCHAR REQUIRED], area_sqm [FLOAT NULLABLE], rooms [FLOAT NULLABLE], ownership_share [INTEGER NULLABLE])\nowners(owner_id [VARCHAR PK REQUIRED], salutation [VARCHAR NULLABLE], first_name [VARCHAR NULLABLE], last_name [VARCHAR NULLABLE], company [VARCHAR NULLABLE], street [VARCHAR NULLABLE], postal_code [VARCHAR NULLABLE], city [VARCHAR NULLABLE], country [VARCHAR REQUIRED], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], is_self_user [BOOLEAN REQUIRED], has_sev_mandate [BOOLEAN REQUIRED], is_council_member [BOOLEAN REQUIRED], language [VARCHAR REQUIRED])\ntenants(tenant_id [VARCHAR PK REQUIRED], salutation [VARCHAR NULLABLE], first_name [VARCHAR NULLABLE], last_name [VARCHAR NULLABLE], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], unit_id [VARCHAR NULLABLE FK->units.unit_id], landlord_owner_id [VARCHAR NULLABLE FK->owners.owner_id], lease_start [DATE NULLABLE], lease_end [DATE NULLABLE], cold_rent [FLOAT NULLABLE], utility_advance [FLOAT NULLABLE], deposit [FLOAT NULLABLE], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], language [VARCHAR REQUIRED])\nservice_providers(provider_id [VARCHAR PK REQUIRED], company [VARCHAR REQUIRED], branch [VARCHAR NULLABLE], contact_person [VARCHAR NULLABLE], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], street [VARCHAR NULLABLE], postal_code [VARCHAR NULLABLE], city [VARCHAR NULLABLE], country [VARCHAR REQUIRED], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], vat_id [VARCHAR NULLABLE], tax_number [VARCHAR NULLABLE], style [VARCHAR NULLABLE], language [VARCHAR REQUIRED], monthly_contract [FLOAT NULLABLE], hourly_rate [FLOAT NULLABLE])\nbank_transactions(transaction_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], booking_date [DATE REQUIRED], direction [VARCHAR REQUIRED], amount [FLOAT REQUIRED], category [VARCHAR NULLABLE], counterparty_name [VARCHAR NULLABLE], purpose [VARCHAR NULLABLE], reference_id [VARCHAR NULLABLE], error_types [VARCHAR NULLABLE])\ninvoices(invoice_id [VARCHAR PK REQUIRED], invoice_number [VARCHAR NULLABLE], invoice_date [DATE REQUIRED], provider_id [VARCHAR NULLABLE FK->service_providers.provider_id], provider_company [VARCHAR NULLABLE], recipient [VARCHAR NULLABLE], property_id [VARCHAR NULLABLE FK->properties.property_id], net_amount [FLOAT NULLABLE], vat_amount [FLOAT NULLABLE], gross_amount [FLOAT NULLABLE], iban [VARCHAR NULLABLE], paid_transaction_id [VARCHAR NULLABLE FK->bank_transactions.transaction_id], source_event_id [VARCHAR NULLABLE FK->source_events.event_id], error_types [VARCHAR NULLABLE])\nsource_events(event_id [VARCHAR PK REQUIRED], source_type [VARCHAR REQUIRED], property_id [VARCHAR NULLABLE FK->properties.property_id], source_path [VARCHAR NULLABLE], received_at [DATETIME NULLABLE], thread_id [VARCHAR NULLABLE], direction [VARCHAR NULLABLE], from_address [VARCHAR NULLABLE], to_address [VARCHAR NULLABLE], subject [VARCHAR NULLABLE], category [VARCHAR NULLABLE], language [VARCHAR NULLABLE], raw_content [VARCHAR NULLABLE], error_types [VARCHAR NULLABLE])\nfacts(fact_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], entity_type [VARCHAR REQUIRED], entity_id [VARCHAR REQUIRED], category [VARCHAR REQUIRED], statement [VARCHAR REQUIRED], source_event_id [VARCHAR NULLABLE FK->source_events.event_id], extracted_at [DATETIME REQUIRED], superseded_by [VARCHAR NULLABLE FK->facts.fact_id], status [VARCHAR REQUIRED], confidence [FLOAT NULLABLE])\n\nJSON SCHEMA:\n{\"$defs\": {\"ExtractOperation\": {\"properties\": {\"table\": {\"enum\": [\"properties\", \"buildings\", \"units\", \"owners\", \"tenants\", \"service_providers\", \"bank_transactions\", \"invoices\", \"source_events\", \"facts\"], \"title\": \"Table\", \"type\": \"string\"}, \"record\": {\"additionalProperties\": true, \"title\": \"Record\", \"type\": \"object\"}}, \"required\": [\"table\"], \"title\": \"ExtractOperation\", \"type\": \"object\"}}, \"properties\": {\"summary\": {\"default\": \"\", \"title\": \"Summary\", \"type\": \"string\"}, \"records\": {\"items\": {\"$ref\": \"#/$defs/ExtractOperation\"}, \"title\": \"Records\", \"type\": \"array\"}}, \"title\": \"DocumentExtraction\", \"type\": \"object\"}",
+  "user_prompt": "Document path: rechnungen/2024-05/20240528_DL-004_INV-00038.pdf\nDocument text:\n\"\"\"\nReinigungsservice Kowalski\nGerold-Franke-Weg 1  .  76797 Guben\nTel: +49(0)8366 752545  .  Malte Becker\nAbsender: Reinigungsservice Kowalski, 76797 Guben\nHuber & Partner Immobilienverwaltung GmbH\nFriedrichstrasse 112\n10117 Berlin\nRechnungsnr.: R20240029\nDatum: 28.05.2024\nRechnung\nLeistungszeitraum: 06.05.2024 - 28.05.2024\nPos.\nBeschreibung\nMenge\nEinzelpreis\nGesamt\n1\nFenster-Innenreinigung\n3.5 h\n22,00 EUR\n77,00 EUR\n2\nReinigung Treppenhaus Haus 16\n1 pauschal\n110,00 EUR\n110,00 EUR\n3\nReinigung Treppenhaus Haus 12\n1 pauschal\n150,00 EUR\n150,00 EUR\nSumme netto:\n337,00 EUR\nzzgl. 19% MwSt:\n64,03 EUR\nRechnungsbetrag:\n401,03 EUR\nZahlbar innerhalb 14 Tagen.\nIBAN: DE44 1007 0124 5991 0229 01   BIC: DEUTDEBB101\nSteuernr.: 64/597/89570   Ust-ID: DE810751262\n\n\"\"\"",
+  "raw_model_output": "{\"summary\":\"Rechnung R20240029 von Reinigungsservice Kowalski über 401,03 EUR brutto für Reinigungsleistungen im Mai 2024.\",\"records\":[{\"table\":\"source_events\",\"record\":{\"event_id\":\"EVT-INV-00038\",\"source_type\":\"pdf\",\"property_id\":\"LIE-001\",\"source_path\":\"rechnungen/2024-05/20240528_DL-004_INV-00038.pdf\",\"category\":\"invoice\",\"language\":\"de\",\"raw_content\":\"Reinigungsservice Kowalski\\nGerold-Franke-Weg 1  .  76797 Guben\\nTel: +49(0)8366 752545  .  Malte Becker\\nAbsender: Reinigungsservice Kowalski, 76797 Guben\\nHuber & Partner Immobilienverwaltung GmbH\\nFriedrichstrasse 112\\n10117 Berlin\\nRechnungsnr.: R20240029\\nDatum: 28.05.2024\\nRechnung\\nLeistungszeitraum: 06.05.2024 - 28.05.2024\\nPos.\\nBeschreibung\\nMenge\\nEinzelpreis\\nGesamt\\n1\\nFenster-Innenreinigung\\n3.5 h\\n22,00 EUR\\n77,00 EUR\\n2\\nReinigung Treppenhaus Haus 16\\n1 pauschal\\n110,00 EUR\\n110,00 EUR\\n3\\nReinigung Treppenhaus Haus 12\\n1 pauschal\\n150,00 EUR\\n150,00 EUR\\nSumme netto:\\n337,00 EUR\\nzzgl. 19% MwSt:\\n64,03 EUR\\nRechnungsbetrag:\\n401,03 EUR\\nZahlbar innerhalb 14 Tagen.\\nIBAN: DE44 1007 0124 5991 0229 01   BIC: DEUTDEBB101\\nSteuernr.: 64/597/89570   Ust-ID: DE810751262\"}},{\"table\":\"service_providers\",\"record\":{\"provider_id\":\"DL-004\",\"company\":\"Reinigungsservice Kowalski\",\"contact_person\":\"Malte Becker\",\"phone\":\"+49(0)8366 752545\",\"street\":\"Gerold-Franke-Weg 1\",\"postal_code\":\"76797\",\"city\":\"Guben\",\"country\":\"DE\",\"iban\":\"DE44 1007 0124 5991 0229 01\",\"bic\":\"DEUTDEBB101\",\"vat_id\":\"DE810751262\",\"tax_number\":\"64/597/89570\",\"language\":\"de\"}},{\"table\":\"invoices\",\"record\":{\"invoice_id\":\"INV-00038\",\"invoice_number\":\"R20240029\",\"invoice_date\":\"2024-05-28\",\"provider_id\":\"DL-004\",\"provider_company\":\"Reinigungsservice Kowalski\",\"recipient\":\"Huber & Partner Immobilienverwaltung GmbH, Friedrichstrasse 112, 10117 Berlin\",\"property_id\":\"LIE-001\",\"net_amount\":337.0,\"vat_amount\":64.03,\"gross_amount\":401.03,\"iban\":\"DE44 1007 0124 5991 0229 01\",\"source_event_id\":\"EVT-INV-00038\"}},{\"table\":\"facts\",\"record\":{\"fact_id\":\"FACT-INV-00038-001\",\"property_id\":\"LIE-001\",\"entity_type\":\"invoice\",\"entity_id\":\"INV-00038\",\"category\":\"service_period\",\"statement\":\"Leistungszeitraum der Rechnung R20240029: 06.05.2024 bis 28.05.2024.\",\"source_event_id\":\"EVT-INV-00038\",\"extracted_at\":\"2026-04-25T00:00:00\",\"status\":\"active\",\"confidence\":1.0}},{\"table\":\"facts\",\"record\":{\"fact_id\":\"FACT-INV-00038-002\",\"property_id\":\"LIE-001\",\"entity_type\":\"invoice\",\"entity_id\":\"INV-00038\",\"category\":\"line_items\",\"statement\":\"Rechnungspositionen: Fenster-Innenreinigung 3,5 h à 22,00 EUR = 77,00 EUR; Reinigung Treppenhaus Haus 16 pauschal 110,00 EUR; Reinigung Treppenhaus Haus 12 pauschal 150,00 EUR.\",\"source_event_id\":\"EVT-INV-00038\",\"extracted_at\":\"2026-04-25T00:00:00\",\"status\":\"active\",\"confidence\":1.0}}]}",
+  "validated_output": {
+    "summary": "Rechnung R20240029 von Reinigungsservice Kowalski über 401,03 EUR brutto für Reinigungsleistungen im Mai 2024.",
+    "records": [
+      {
+        "table": "source_events",
+        "record": {
+          "event_id": "EVT-INV-00038",
+          "source_type": "pdf",
+          "property_id": "LIE-001",
+          "source_path": "rechnungen/2024-05/20240528_DL-004_INV-00038.pdf",
+          "category": "invoice",
+          "language": "de",
+          "raw_content": "Reinigungsservice Kowalski\nGerold-Franke-Weg 1  .  76797 Guben\nTel: +49(0)8366 752545  .  Malte Becker\nAbsender: Reinigungsservice Kowalski, 76797 Guben\nHuber & Partner Immobilienverwaltung GmbH\nFriedrichstrasse 112\n10117 Berlin\nRechnungsnr.: R20240029\nDatum: 28.05.2024\nRechnung\nLeistungszeitraum: 06.05.2024 - 28.05.2024\nPos.\nBeschreibung\nMenge\nEinzelpreis\nGesamt\n1\nFenster-Innenreinigung\n3.5 h\n22,00 EUR\n77,00 EUR\n2\nReinigung Treppenhaus Haus 16\n1 pauschal\n110,00 EUR\n110,00 EUR\n3\nReinigung Treppenhaus Haus 12\n1 pauschal\n150,00 EUR\n150,00 EUR\nSumme netto:\n337,00 EUR\nzzgl. 19% MwSt:\n64,03 EUR\nRechnungsbetrag:\n401,03 EUR\nZahlbar innerhalb 14 Tagen.\nIBAN: DE44 1007 0124 5991 0229 01   BIC: DEUTDEBB101\nSteuernr.: 64/597/89570   Ust-ID: DE810751262"
+        }
+      },
+      {
+        "table": "service_providers",
+        "record": {
+          "provider_id": "DL-004",
+          "company": "Reinigungsservice Kowalski",
+          "contact_person": "Malte Becker",
+          "phone": "+49(0)8366 752545",
+          "street": "Gerold-Franke-Weg 1",
+          "postal_code": "76797",
+          "city": "Guben",
+          "country": "DE",
+          "iban": "DE44 1007 0124 5991 0229 01",
+          "bic": "DEUTDEBB101",
+          "vat_id": "DE810751262",
+          "tax_number": "64/597/89570",
+          "language": "de"
+        }
+      },
+      {
+        "table": "invoices",
+        "record": {
+          "invoice_id": "INV-00038",
+          "invoice_number": "R20240029",
+          "invoice_date": "2024-05-28",
+          "provider_id": "DL-004",
+          "provider_company": "Reinigungsservice Kowalski",
+          "recipient": "Huber & Partner Immobilienverwaltung GmbH, Friedrichstrasse 112, 10117 Berlin",
+          "property_id": "LIE-001",
+          "net_amount": 337.0,
+          "vat_amount": 64.03,
+          "gross_amount": 401.03,
+          "iban": "DE44 1007 0124 5991 0229 01",
+          "source_event_id": "EVT-INV-00038"
+        }
+      },
+      {
+        "table": "facts",
+        "record": {
+          "fact_id": "FACT-INV-00038-001",
+          "property_id": "LIE-001",
+          "entity_type": "invoice",
+          "entity_id": "INV-00038",
+          "category": "service_period",
+          "statement": "Leistungszeitraum der Rechnung R20240029: 06.05.2024 bis 28.05.2024.",
+          "source_event_id": "EVT-INV-00038",
+          "extracted_at": "2026-04-25T00:00:00",
+          "status": "active",
+          "confidence": 1.0
+        }
+      },
+      {
+        "table": "facts",
+        "record": {
+          "fact_id": "FACT-INV-00038-002",
+          "property_id": "LIE-001",
+          "entity_type": "invoice",
+          "entity_id": "INV-00038",
+          "category": "line_items",
+          "statement": "Rechnungspositionen: Fenster-Innenreinigung 3,5 h à 22,00 EUR = 77,00 EUR; Reinigung Treppenhaus Haus 16 pauschal 110,00 EUR; Reinigung Treppenhaus Haus 12 pauschal 150,00 EUR.",
+          "source_event_id": "EVT-INV-00038",
+          "extracted_at": "2026-04-25T00:00:00",
+          "status": "active",
+          "confidence": 1.0
+        }
+      }
+    ]
+  },
+  "parse_error": null
+}

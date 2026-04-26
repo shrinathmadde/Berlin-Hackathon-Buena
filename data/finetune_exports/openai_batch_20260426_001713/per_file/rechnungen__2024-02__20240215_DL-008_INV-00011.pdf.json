@@ -1,0 +1,60 @@
+{
+  "document_path": "rechnungen/2024-02/20240215_DL-008_INV-00011.pdf",
+  "model": "gpt-5.5-2026-04-23",
+  "system_prompt": "You extract structured records from one German property-management document.\nReturn valid JSON only. No markdown fences. No prose. No comments.\nThe JSON must match the schema exactly.\nUse only the database tables and columns listed below.\nCreate records only when the document clearly supports them.\nFor email/letter/unstructured communication, prefer a source_events record and facts records.\nFor invoices, prefer invoices plus source_events when provenance is useful.\nFor bank CSV rows or statements, prefer bank_transactions.\nFor master data files, use owners, tenants, units, buildings, properties, or service_providers as needed.\nDo not invent unsupported columns.\nDo not emit fields that are not present in the document unless they are obvious defaults.\nWhen a property id is needed and the document is clearly about the seeded property, use 'LIE-001'.\nUse ISO dates and datetimes where possible.\nUse exact table names from the schema.\n\nSCHEMA:\nproperties(property_id [VARCHAR PK REQUIRED], name [VARCHAR REQUIRED], street [VARCHAR REQUIRED], postal_code [VARCHAR REQUIRED], city [VARCHAR REQUIRED], country [VARCHAR REQUIRED], built_year [INTEGER NULLABLE], renovated_year [INTEGER NULLABLE], manager_name [VARCHAR NULLABLE], manager_street [VARCHAR NULLABLE], manager_postal_code [VARCHAR NULLABLE], manager_city [VARCHAR NULLABLE], manager_email [VARCHAR NULLABLE], manager_phone [VARCHAR NULLABLE], manager_iban [VARCHAR NULLABLE], manager_bic [VARCHAR NULLABLE], manager_bank [VARCHAR NULLABLE], manager_tax_number [VARCHAR NULLABLE], weg_account_iban [VARCHAR NULLABLE], weg_account_bic [VARCHAR NULLABLE], weg_account_bank [VARCHAR NULLABLE], reserve_account_iban [VARCHAR NULLABLE], reserve_account_bic [VARCHAR NULLABLE])\nbuildings(building_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], house_number [VARCHAR REQUIRED], units_count [INTEGER NULLABLE], floors [INTEGER NULLABLE], has_elevator [BOOLEAN REQUIRED], built_year [INTEGER NULLABLE])\nunits(unit_id [VARCHAR PK REQUIRED], building_id [VARCHAR REQUIRED FK->buildings.building_id], property_id [VARCHAR REQUIRED FK->properties.property_id], owner_id [VARCHAR NULLABLE FK->owners.owner_id], unit_number [VARCHAR REQUIRED], location [VARCHAR NULLABLE], type [VARCHAR REQUIRED], area_sqm [FLOAT NULLABLE], rooms [FLOAT NULLABLE], ownership_share [INTEGER NULLABLE])\nowners(owner_id [VARCHAR PK REQUIRED], salutation [VARCHAR NULLABLE], first_name [VARCHAR NULLABLE], last_name [VARCHAR NULLABLE], company [VARCHAR NULLABLE], street [VARCHAR NULLABLE], postal_code [VARCHAR NULLABLE], city [VARCHAR NULLABLE], country [VARCHAR REQUIRED], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], is_self_user [BOOLEAN REQUIRED], has_sev_mandate [BOOLEAN REQUIRED], is_council_member [BOOLEAN REQUIRED], language [VARCHAR REQUIRED])\ntenants(tenant_id [VARCHAR PK REQUIRED], salutation [VARCHAR NULLABLE], first_name [VARCHAR NULLABLE], last_name [VARCHAR NULLABLE], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], unit_id [VARCHAR NULLABLE FK->units.unit_id], landlord_owner_id [VARCHAR NULLABLE FK->owners.owner_id], lease_start [DATE NULLABLE], lease_end [DATE NULLABLE], cold_rent [FLOAT NULLABLE], utility_advance [FLOAT NULLABLE], deposit [FLOAT NULLABLE], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], language [VARCHAR REQUIRED])\nservice_providers(provider_id [VARCHAR PK REQUIRED], company [VARCHAR REQUIRED], branch [VARCHAR NULLABLE], contact_person [VARCHAR NULLABLE], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], street [VARCHAR NULLABLE], postal_code [VARCHAR NULLABLE], city [VARCHAR NULLABLE], country [VARCHAR REQUIRED], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], vat_id [VARCHAR NULLABLE], tax_number [VARCHAR NULLABLE], style [VARCHAR NULLABLE], language [VARCHAR REQUIRED], monthly_contract [FLOAT NULLABLE], hourly_rate [FLOAT NULLABLE])\nbank_transactions(transaction_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], booking_date [DATE REQUIRED], direction [VARCHAR REQUIRED], amount [FLOAT REQUIRED], category [VARCHAR NULLABLE], counterparty_name [VARCHAR NULLABLE], purpose [VARCHAR NULLABLE], reference_id [VARCHAR NULLABLE], error_types [VARCHAR NULLABLE])\ninvoices(invoice_id [VARCHAR PK REQUIRED], invoice_number [VARCHAR NULLABLE], invoice_date [DATE REQUIRED], provider_id [VARCHAR NULLABLE FK->service_providers.provider_id], provider_company [VARCHAR NULLABLE], recipient [VARCHAR NULLABLE], property_id [VARCHAR NULLABLE FK->properties.property_id], net_amount [FLOAT NULLABLE], vat_amount [FLOAT NULLABLE], gross_amount [FLOAT NULLABLE], iban [VARCHAR NULLABLE], paid_transaction_id [VARCHAR NULLABLE FK->bank_transactions.transaction_id], source_event_id [VARCHAR NULLABLE FK->source_events.event_id], error_types [VARCHAR NULLABLE])\nsource_events(event_id [VARCHAR PK REQUIRED], source_type [VARCHAR REQUIRED], property_id [VARCHAR NULLABLE FK->properties.property_id], source_path [VARCHAR NULLABLE], received_at [DATETIME NULLABLE], thread_id [VARCHAR NULLABLE], direction [VARCHAR NULLABLE], from_address [VARCHAR NULLABLE], to_address [VARCHAR NULLABLE], subject [VARCHAR NULLABLE], category [VARCHAR NULLABLE], language [VARCHAR NULLABLE], raw_content [VARCHAR NULLABLE], error_types [VARCHAR NULLABLE])\nfacts(fact_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], entity_type [VARCHAR REQUIRED], entity_id [VARCHAR REQUIRED], category [VARCHAR REQUIRED], statement [VARCHAR REQUIRED], source_event_id [VARCHAR NULLABLE FK->source_events.event_id], extracted_at [DATETIME REQUIRED], superseded_by [VARCHAR NULLABLE FK->facts.fact_id], status [VARCHAR REQUIRED], confidence [FLOAT NULLABLE])\n\nJSON SCHEMA:\n{\"$defs\": {\"ExtractOperation\": {\"properties\": {\"table\": {\"enum\": [\"properties\", \"buildings\", \"units\", \"owners\", \"tenants\", \"service_providers\", \"bank_transactions\", \"invoices\", \"source_events\", \"facts\"], \"title\": \"Table\", \"type\": \"string\"}, \"record\": {\"additionalProperties\": true, \"title\": \"Record\", \"type\": \"object\"}}, \"required\": [\"table\"], \"title\": \"ExtractOperation\", \"type\": \"object\"}}, \"properties\": {\"summary\": {\"default\": \"\", \"title\": \"Summary\", \"type\": \"string\"}, \"records\": {\"items\": {\"$ref\": \"#/$defs/ExtractOperation\"}, \"title\": \"Records\", \"type\": \"array\"}}, \"title\": \"DocumentExtraction\", \"type\": \"object\"}",
+  "user_prompt": "Document path: rechnungen/2024-02/20240215_DL-008_INV-00011.pdf\nDocument text:\n\"\"\"\nVattenfall Europe Sales GmbH\nStrom Allgemein\nSchottinring 871 . 44905 Heiligenstadt\nKundennr.: KN-45103\nRechnungsnr.: INV-2024-0093\nDatum: 15.02.2024\nHuber & Partner Immobilienverwaltung GmbH\nFriedrichstrasse 112\n10117 Berlin\nJahresabrechnung / Rechnung\nPosition\nMenge\nEinzelpreis\nBetrag\nStromlieferung Allgemeinstrom (Jahresabrechnung)\n8288 kWh\n0,38 EUR\n3.149,44 EUR\nSumme netto\n3.149,44 EUR\nMwSt. 19%\n598,39 EUR\nGesamtbetrag\n3.747,83 EUR\nBankverbindung: IBAN DE85 1001 0010 5297 5161 36 | BIC DEUTDEBB101\nSteuernr.: 20/505/50668 | Ust-ID: DE662600500 | Tel.: +49(0)3292 12779\n\n\"\"\"",
+  "raw_model_output": "{\"summary\":\"Invoice from Vattenfall Europe Sales GmbH dated 2024-02-15 for annual common electricity billing, gross amount 3747.83 EUR.\",\"records\":[{\"table\":\"source_events\",\"record\":{\"event_id\":\"SE-20240215-DL-008-INV-00011\",\"source_type\":\"pdf\",\"source_path\":\"rechnungen/2024-02/20240215_DL-008_INV-00011.pdf\",\"direction\":\"incoming\",\"subject\":\"Jahresabrechnung / Rechnung INV-2024-0093\",\"category\":\"invoice\",\"language\":\"de\",\"raw_content\":\"Vattenfall Europe Sales GmbH\\nStrom Allgemein\\nSchottinring 871 . 44905 Heiligenstadt\\nKundennr.: KN-45103\\nRechnungsnr.: INV-2024-0093\\nDatum: 15.02.2024\\nHuber & Partner Immobilienverwaltung GmbH\\nFriedrichstrasse 112\\n10117 Berlin\\nJahresabrechnung / Rechnung\\nPosition\\nMenge\\nEinzelpreis\\nBetrag\\nStromlieferung Allgemeinstrom (Jahresabrechnung)\\n8288 kWh\\n0,38 EUR\\n3.149,44 EUR\\nSumme netto\\n3.149,44 EUR\\nMwSt. 19%\\n598,39 EUR\\nGesamtbetrag\\n3.747,83 EUR\\nBankverbindung: IBAN DE85 1001 0010 5297 5161 36 | BIC DEUTDEBB101\\nSteuernr.: 20/505/50668 | Ust-ID: DE662600500 | Tel.: +49(0)3292 12779\"}},{\"table\":\"service_providers\",\"record\":{\"provider_id\":\"DL-008\",\"company\":\"Vattenfall Europe Sales GmbH\",\"branch\":\"Strom Allgemein\",\"phone\":\"+49(0)3292 12779\",\"street\":\"Schottinring 871\",\"postal_code\":\"44905\",\"city\":\"Heiligenstadt\",\"country\":\"DE\",\"iban\":\"DE85 1001 0010 5297 5161 36\",\"bic\":\"DEUTDEBB101\",\"vat_id\":\"DE662600500\",\"tax_number\":\"20/505/50668\",\"language\":\"de\"}},{\"table\":\"invoices\",\"record\":{\"invoice_id\":\"INV-00011\",\"invoice_number\":\"INV-2024-0093\",\"invoice_date\":\"2024-02-15\",\"provider_id\":\"DL-008\",\"provider_company\":\"Vattenfall Europe Sales GmbH\",\"recipient\":\"Huber & Partner Immobilienverwaltung GmbH, Friedrichstrasse 112, 10117 Berlin\",\"net_amount\":3149.44,\"vat_amount\":598.39,\"gross_amount\":3747.83,\"iban\":\"DE85 1001 0010 5297 5161 36\",\"source_event_id\":\"SE-20240215-DL-008-INV-00011\"}}]}",
+  "validated_output": {
+    "summary": "Invoice from Vattenfall Europe Sales GmbH dated 2024-02-15 for annual common electricity billing, gross amount 3747.83 EUR.",
+    "records": [
+      {
+        "table": "source_events",
+        "record": {
+          "event_id": "SE-20240215-DL-008-INV-00011",
+          "source_type": "pdf",
+          "source_path": "rechnungen/2024-02/20240215_DL-008_INV-00011.pdf",
+          "direction": "incoming",
+          "subject": "Jahresabrechnung / Rechnung INV-2024-0093",
+          "category": "invoice",
+          "language": "de",
+          "raw_content": "Vattenfall Europe Sales GmbH\nStrom Allgemein\nSchottinring 871 . 44905 Heiligenstadt\nKundennr.: KN-45103\nRechnungsnr.: INV-2024-0093\nDatum: 15.02.2024\nHuber & Partner Immobilienverwaltung GmbH\nFriedrichstrasse 112\n10117 Berlin\nJahresabrechnung / Rechnung\nPosition\nMenge\nEinzelpreis\nBetrag\nStromlieferung Allgemeinstrom (Jahresabrechnung)\n8288 kWh\n0,38 EUR\n3.149,44 EUR\nSumme netto\n3.149,44 EUR\nMwSt. 19%\n598,39 EUR\nGesamtbetrag\n3.747,83 EUR\nBankverbindung: IBAN DE85 1001 0010 5297 5161 36 | BIC DEUTDEBB101\nSteuernr.: 20/505/50668 | Ust-ID: DE662600500 | Tel.: +49(0)3292 12779"
+        }
+      },
+      {
+        "table": "service_providers",
+        "record": {
+          "provider_id": "DL-008",
+          "company": "Vattenfall Europe Sales GmbH",
+          "branch": "Strom Allgemein",
+          "phone": "+49(0)3292 12779",
+          "street": "Schottinring 871",
+          "postal_code": "44905",
+          "city": "Heiligenstadt",
+          "country": "DE",
+          "iban": "DE85 1001 0010 5297 5161 36",
+          "bic": "DEUTDEBB101",
+          "vat_id": "DE662600500",
+          "tax_number": "20/505/50668",
+          "language": "de"
+        }
+      },
+      {
+        "table": "invoices",
+        "record": {
+          "invoice_id": "INV-00011",
+          "invoice_number": "INV-2024-0093",
+          "invoice_date": "2024-02-15",
+          "provider_id": "DL-008",
+          "provider_company": "Vattenfall Europe Sales GmbH",
+          "recipient": "Huber & Partner Immobilienverwaltung GmbH, Friedrichstrasse 112, 10117 Berlin",
+          "net_amount": 3149.44,
+          "vat_amount": 598.39,
+          "gross_amount": 3747.83,
+          "iban": "DE85 1001 0010 5297 5161 36",
+          "source_event_id": "SE-20240215-DL-008-INV-00011"
+        }
+      }
+    ]
+  },
+  "parse_error": null
+}

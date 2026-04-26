@@ -6,9 +6,15 @@ OpenAI, OpenRouter, Groq, Together, Anyscale, vLLM, LM Studio, Ollama
 """
 from __future__ import annotations
 
+import time
+
 import httpx
 
 from app.llm.base import LLMError, LLMProvider
+
+_MAX_RETRIES = 8
+_BACKOFF_BASE = 2.0
+_BACKOFF_CAP = 120.0
 
 
 class OpenAICompatibleProvider(LLMProvider):
@@ -50,21 +56,32 @@ class OpenAICompatibleProvider(LLMProvider):
         else:
             payload["max_tokens"] = max_tokens
             payload["temperature"] = temperature
-        try:
-            with httpx.Client(timeout=self._timeout) as client:
-                r = client.post(
-                    f"{self._base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                )
-            if r.status_code >= 400:
-                raise LLMError(f"{r.status_code}: {r.text[:500]}")
-            data = r.json()
-            return data["choices"][0]["message"]["content"]
-        except httpx.HTTPError as e:
-            raise LLMError(f"transport: {type(e).__name__}: {e}") from e
-        except (KeyError, IndexError, ValueError) as e:
-            raise LLMError(f"unexpected response shape: {e}") from e
+        last_error: LLMError | None = None
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                with httpx.Client(timeout=self._timeout) as client:
+                    r = client.post(
+                        f"{self._base_url}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self._api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json=payload,
+                    )
+                if r.status_code == 429:
+                    retry_after = float(r.headers.get("Retry-After", 0))
+                    wait = max(retry_after, min(_BACKOFF_CAP, _BACKOFF_BASE ** attempt))
+                    last_error = LLMError(f"{r.status_code}: {r.text[:500]}")
+                    if attempt < _MAX_RETRIES:
+                        time.sleep(wait)
+                        continue
+                    raise last_error
+                if r.status_code >= 400:
+                    raise LLMError(f"{r.status_code}: {r.text[:500]}")
+                data = r.json()
+                return data["choices"][0]["message"]["content"]
+            except httpx.HTTPError as e:
+                raise LLMError(f"transport: {type(e).__name__}: {e}") from e
+            except (KeyError, IndexError, ValueError) as e:
+                raise LLMError(f"unexpected response shape: {e}") from e
+        raise last_error  # type: ignore[misc]

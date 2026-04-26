@@ -1,0 +1,52 @@
+{
+  "$defs": {
+    "ExtractOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "table": {
+          "enum": [
+            "properties",
+            "buildings",
+            "units",
+            "owners",
+            "tenants",
+            "service_providers",
+            "bank_transactions",
+            "invoices",
+            "source_events",
+            "facts"
+          ],
+          "title": "Table",
+          "type": "string"
+        },
+        "record": {
+          "additionalProperties": true,
+          "title": "Record",
+          "type": "object"
+        }
+      },
+      "required": [
+        "table"
+      ],
+      "title": "ExtractOperation",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "summary": {
+      "default": "",
+      "title": "Summary",
+      "type": "string"
+    },
+    "records": {
+      "items": {
+        "$ref": "#/$defs/ExtractOperation"
+      },
+      "title": "Records",
+      "type": "array"
+    }
+  },
+  "additionalProperties": false,
+  "title": "DocumentExtraction",
+  "type": "object"
+}

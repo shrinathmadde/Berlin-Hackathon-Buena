@@ -1,0 +1,62 @@
+{
+  "document_path": "rechnungen/2024-01/20240124_DL-011_INV-00005.pdf",
+  "model": "gpt-5.5-2026-04-23",
+  "system_prompt": "You extract structured records from one German property-management document.\nReturn valid JSON only. No markdown fences. No prose. No comments.\nThe JSON must match the schema exactly.\nUse only the database tables and columns listed below.\nCreate records only when the document clearly supports them.\nFor email/letter/unstructured communication, prefer a source_events record and facts records.\nFor invoices, prefer invoices plus source_events when provenance is useful.\nFor bank CSV rows or statements, prefer bank_transactions.\nFor master data files, use owners, tenants, units, buildings, properties, or service_providers as needed.\nDo not invent unsupported columns.\nDo not emit fields that are not present in the document unless they are obvious defaults.\nWhen a property id is needed and the document is clearly about the seeded property, use 'LIE-001'.\nUse ISO dates and datetimes where possible.\nUse exact table names from the schema.\n\nSCHEMA:\nproperties(property_id [VARCHAR PK REQUIRED], name [VARCHAR REQUIRED], street [VARCHAR REQUIRED], postal_code [VARCHAR REQUIRED], city [VARCHAR REQUIRED], country [VARCHAR REQUIRED], built_year [INTEGER NULLABLE], renovated_year [INTEGER NULLABLE], manager_name [VARCHAR NULLABLE], manager_street [VARCHAR NULLABLE], manager_postal_code [VARCHAR NULLABLE], manager_city [VARCHAR NULLABLE], manager_email [VARCHAR NULLABLE], manager_phone [VARCHAR NULLABLE], manager_iban [VARCHAR NULLABLE], manager_bic [VARCHAR NULLABLE], manager_bank [VARCHAR NULLABLE], manager_tax_number [VARCHAR NULLABLE], weg_account_iban [VARCHAR NULLABLE], weg_account_bic [VARCHAR NULLABLE], weg_account_bank [VARCHAR NULLABLE], reserve_account_iban [VARCHAR NULLABLE], reserve_account_bic [VARCHAR NULLABLE])\nbuildings(building_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], house_number [VARCHAR REQUIRED], units_count [INTEGER NULLABLE], floors [INTEGER NULLABLE], has_elevator [BOOLEAN REQUIRED], built_year [INTEGER NULLABLE])\nunits(unit_id [VARCHAR PK REQUIRED], building_id [VARCHAR REQUIRED FK->buildings.building_id], property_id [VARCHAR REQUIRED FK->properties.property_id], owner_id [VARCHAR NULLABLE FK->owners.owner_id], unit_number [VARCHAR REQUIRED], location [VARCHAR NULLABLE], type [VARCHAR REQUIRED], area_sqm [FLOAT NULLABLE], rooms [FLOAT NULLABLE], ownership_share [INTEGER NULLABLE])\nowners(owner_id [VARCHAR PK REQUIRED], salutation [VARCHAR NULLABLE], first_name [VARCHAR NULLABLE], last_name [VARCHAR NULLABLE], company [VARCHAR NULLABLE], street [VARCHAR NULLABLE], postal_code [VARCHAR NULLABLE], city [VARCHAR NULLABLE], country [VARCHAR REQUIRED], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], is_self_user [BOOLEAN REQUIRED], has_sev_mandate [BOOLEAN REQUIRED], is_council_member [BOOLEAN REQUIRED], language [VARCHAR REQUIRED])\ntenants(tenant_id [VARCHAR PK REQUIRED], salutation [VARCHAR NULLABLE], first_name [VARCHAR NULLABLE], last_name [VARCHAR NULLABLE], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], unit_id [VARCHAR NULLABLE FK->units.unit_id], landlord_owner_id [VARCHAR NULLABLE FK->owners.owner_id], lease_start [DATE NULLABLE], lease_end [DATE NULLABLE], cold_rent [FLOAT NULLABLE], utility_advance [FLOAT NULLABLE], deposit [FLOAT NULLABLE], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], language [VARCHAR REQUIRED])\nservice_providers(provider_id [VARCHAR PK REQUIRED], company [VARCHAR REQUIRED], branch [VARCHAR NULLABLE], contact_person [VARCHAR NULLABLE], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], street [VARCHAR NULLABLE], postal_code [VARCHAR NULLABLE], city [VARCHAR NULLABLE], country [VARCHAR REQUIRED], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], vat_id [VARCHAR NULLABLE], tax_number [VARCHAR NULLABLE], style [VARCHAR NULLABLE], language [VARCHAR REQUIRED], monthly_contract [FLOAT NULLABLE], hourly_rate [FLOAT NULLABLE])\nbank_transactions(transaction_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], booking_date [DATE REQUIRED], direction [VARCHAR REQUIRED], amount [FLOAT REQUIRED], category [VARCHAR NULLABLE], counterparty_name [VARCHAR NULLABLE], purpose [VARCHAR NULLABLE], reference_id [VARCHAR NULLABLE], error_types [VARCHAR NULLABLE])\ninvoices(invoice_id [VARCHAR PK REQUIRED], invoice_number [VARCHAR NULLABLE], invoice_date [DATE REQUIRED], provider_id [VARCHAR NULLABLE FK->service_providers.provider_id], provider_company [VARCHAR NULLABLE], recipient [VARCHAR NULLABLE], property_id [VARCHAR NULLABLE FK->properties.property_id], net_amount [FLOAT NULLABLE], vat_amount [FLOAT NULLABLE], gross_amount [FLOAT NULLABLE], iban [VARCHAR NULLABLE], paid_transaction_id [VARCHAR NULLABLE FK->bank_transactions.transaction_id], source_event_id [VARCHAR NULLABLE FK->source_events.event_id], error_types [VARCHAR NULLABLE])\nsource_events(event_id [VARCHAR PK REQUIRED], source_type [VARCHAR REQUIRED], property_id [VARCHAR NULLABLE FK->properties.property_id], source_path [VARCHAR NULLABLE], received_at [DATETIME NULLABLE], thread_id [VARCHAR NULLABLE], direction [VARCHAR NULLABLE], from_address [VARCHAR NULLABLE], to_address [VARCHAR NULLABLE], subject [VARCHAR NULLABLE], category [VARCHAR NULLABLE], language [VARCHAR NULLABLE], raw_content [VARCHAR NULLABLE], error_types [VARCHAR NULLABLE])\nfacts(fact_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], entity_type [VARCHAR REQUIRED], entity_id [VARCHAR REQUIRED], category [VARCHAR REQUIRED], statement [VARCHAR REQUIRED], source_event_id [VARCHAR NULLABLE FK->source_events.event_id], extracted_at [DATETIME REQUIRED], superseded_by [VARCHAR NULLABLE FK->facts.fact_id], status [VARCHAR REQUIRED], confidence [FLOAT NULLABLE])\n\nJSON SCHEMA:\n{\"$defs\": {\"ExtractOperation\": {\"properties\": {\"table\": {\"enum\": [\"properties\", \"buildings\", \"units\", \"owners\", \"tenants\", \"service_providers\", \"bank_transactions\", \"invoices\", \"source_events\", \"facts\"], \"title\": \"Table\", \"type\": \"string\"}, \"record\": {\"additionalProperties\": true, \"title\": \"Record\", \"type\": \"object\"}}, \"required\": [\"table\"], \"title\": \"ExtractOperation\", \"type\": \"object\"}}, \"properties\": {\"summary\": {\"default\": \"\", \"title\": \"Summary\", \"type\": \"string\"}, \"records\": {\"items\": {\"$ref\": \"#/$defs/ExtractOperation\"}, \"title\": \"Records\", \"type\": \"array\"}}, \"title\": \"DocumentExtraction\", \"type\": \"object\"}",
+  "user_prompt": "Document path: rechnungen/2024-01/20240124_DL-011_INV-00005.pdf\nDocument text:\n\"\"\"\nBSR Berliner Stadtreinigung\nMuellentsorgung\nPechelring 5 . 23573 Dessau\nKundennr.: KN-45103\nRechnungsnr.: 2024/00099\nDatum: 24.01.2024\nHuber & Partner Immobilienverwaltung GmbH\nFriedrichstrasse 112\n10117 Berlin\nJahresabrechnung / Rechnung\nPosition\nMenge\nEinzelpreis\nBetrag\nRestmuell-Entsorgung (120 L, 14-taegig)\n12 pauschal\n78,00 EUR\n936,00 EUR\nPapier-Container\n12 pauschal\n18,00 EUR\n216,00 EUR\nBiotonne\n12 pauschal\n22,00 EUR\n264,00 EUR\nSumme netto\n1.416,00 EUR\nMwSt. 19%\n269,04 EUR\nGesamtbetrag\n1.685,04 EUR\nBankverbindung: IBAN DE49 1203 0000 1774 4905 81 | BIC DEUTDEBB101\nSteuernr.: 14/158/58331 | Ust-ID: DE585238820 | Tel.: 04629148652\n\n\"\"\"",
+  "raw_model_output": "{\"summary\":\"Rechnung BSR Berliner Stadtreinigung vom 2024-01-24 über Müllentsorgung, Gesamtbetrag 1.685,04 EUR.\",\"records\":[{\"table\":\"source_events\",\"record\":{\"event_id\":\"SE-20240124-DL-011-INV-00005\",\"source_type\":\"invoice_pdf\",\"property_id\":\"LIE-001\",\"source_path\":\"rechnungen/2024-01/20240124_DL-011_INV-00005.pdf\",\"direction\":\"inbound\",\"subject\":\"Jahresabrechnung / Rechnung 2024/00099\",\"category\":\"invoice\",\"language\":\"de\",\"raw_content\":\"BSR Berliner Stadtreinigung\\nMuellentsorgung\\nPechelring 5 . 23573 Dessau\\nKundennr.: KN-45103\\nRechnungsnr.: 2024/00099\\nDatum: 24.01.2024\\nHuber & Partner Immobilienverwaltung GmbH\\nFriedrichstrasse 112\\n10117 Berlin\\nJahresabrechnung / Rechnung\\nPosition\\nMenge\\nEinzelpreis\\nBetrag\\nRestmuell-Entsorgung (120 L, 14-taegig)\\n12 pauschal\\n78,00 EUR\\n936,00 EUR\\nPapier-Container\\n12 pauschal\\n18,00 EUR\\n216,00 EUR\\nBiotonne\\n12 pauschal\\n22,00 EUR\\n264,00 EUR\\nSumme netto\\n1.416,00 EUR\\nMwSt. 19%\\n269,04 EUR\\nGesamtbetrag\\n1.685,04 EUR\\nBankverbindung: IBAN DE49 1203 0000 1774 4905 81 | BIC DEUTDEBB101\\nSteuernr.: 14/158/58331 | Ust-ID: DE585238820 | Tel.: 04629148652\"}},{\"table\":\"service_providers\",\"record\":{\"provider_id\":\"DL-011\",\"company\":\"BSR Berliner Stadtreinigung\",\"branch\":\"Muellentsorgung\",\"phone\":\"04629148652\",\"street\":\"Pechelring 5\",\"postal_code\":\"23573\",\"city\":\"Dessau\",\"country\":\"DE\",\"iban\":\"DE49120300001774490581\",\"bic\":\"DEUTDEBB101\",\"vat_id\":\"DE585238820\",\"tax_number\":\"14/158/58331\",\"language\":\"de\"}},{\"table\":\"invoices\",\"record\":{\"invoice_id\":\"INV-00005\",\"invoice_number\":\"2024/00099\",\"invoice_date\":\"2024-01-24\",\"provider_id\":\"DL-011\",\"provider_company\":\"BSR Berliner Stadtreinigung\",\"recipient\":\"Huber & Partner Immobilienverwaltung GmbH, Friedrichstrasse 112, 10117 Berlin\",\"property_id\":\"LIE-001\",\"net_amount\":1416.0,\"vat_amount\":269.04,\"gross_amount\":1685.04,\"iban\":\"DE49120300001774490581\",\"source_event_id\":\"SE-20240124-DL-011-INV-00005\"}}]}",
+  "validated_output": {
+    "summary": "Rechnung BSR Berliner Stadtreinigung vom 2024-01-24 über Müllentsorgung, Gesamtbetrag 1.685,04 EUR.",
+    "records": [
+      {
+        "table": "source_events",
+        "record": {
+          "event_id": "SE-20240124-DL-011-INV-00005",
+          "source_type": "invoice_pdf",
+          "property_id": "LIE-001",
+          "source_path": "rechnungen/2024-01/20240124_DL-011_INV-00005.pdf",
+          "direction": "inbound",
+          "subject": "Jahresabrechnung / Rechnung 2024/00099",
+          "category": "invoice",
+          "language": "de",
+          "raw_content": "BSR Berliner Stadtreinigung\nMuellentsorgung\nPechelring 5 . 23573 Dessau\nKundennr.: KN-45103\nRechnungsnr.: 2024/00099\nDatum: 24.01.2024\nHuber & Partner Immobilienverwaltung GmbH\nFriedrichstrasse 112\n10117 Berlin\nJahresabrechnung / Rechnung\nPosition\nMenge\nEinzelpreis\nBetrag\nRestmuell-Entsorgung (120 L, 14-taegig)\n12 pauschal\n78,00 EUR\n936,00 EUR\nPapier-Container\n12 pauschal\n18,00 EUR\n216,00 EUR\nBiotonne\n12 pauschal\n22,00 EUR\n264,00 EUR\nSumme netto\n1.416,00 EUR\nMwSt. 19%\n269,04 EUR\nGesamtbetrag\n1.685,04 EUR\nBankverbindung: IBAN DE49 1203 0000 1774 4905 81 | BIC DEUTDEBB101\nSteuernr.: 14/158/58331 | Ust-ID: DE585238820 | Tel.: 04629148652"
+        }
+      },
+      {
+        "table": "service_providers",
+        "record": {
+          "provider_id": "DL-011",
+          "company": "BSR Berliner Stadtreinigung",
+          "branch": "Muellentsorgung",
+          "phone": "04629148652",
+          "street": "Pechelring 5",
+          "postal_code": "23573",
+          "city": "Dessau",
+          "country": "DE",
+          "iban": "DE49120300001774490581",
+          "bic": "DEUTDEBB101",
+          "vat_id": "DE585238820",
+          "tax_number": "14/158/58331",
+          "language": "de"
+        }
+      },
+      {
+        "table": "invoices",
+        "record": {
+          "invoice_id": "INV-00005",
+          "invoice_number": "2024/00099",
+          "invoice_date": "2024-01-24",
+          "provider_id": "DL-011",
+          "provider_company": "BSR Berliner Stadtreinigung",
+          "recipient": "Huber & Partner Immobilienverwaltung GmbH, Friedrichstrasse 112, 10117 Berlin",
+          "property_id": "LIE-001",
+          "net_amount": 1416.0,
+          "vat_amount": 269.04,
+          "gross_amount": 1685.04,
+          "iban": "DE49120300001774490581",
+          "source_event_id": "SE-20240124-DL-011-INV-00005"
+        }
+      }
+    ]
+  },
+  "parse_error": null
+}

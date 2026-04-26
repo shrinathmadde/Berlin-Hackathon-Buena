@@ -1,0 +1,118 @@
+{
+  "document_path": "briefe/2024-12/20241205_mieterhoehung_LTR-0045.pdf",
+  "model": "gpt-5.5-2026-04-23",
+  "system_prompt": "You extract structured records from one German property-management document.\nReturn valid JSON only. No markdown fences. No prose. No comments.\nThe JSON must match the schema exactly.\nUse only the database tables and columns listed below.\nCreate records only when the document clearly supports them.\nFor email/letter/unstructured communication, prefer a source_events record and facts records.\nFor invoices, prefer invoices plus source_events when provenance is useful.\nFor bank CSV rows or statements, prefer bank_transactions.\nFor master data files, use owners, tenants, units, buildings, properties, or service_providers as needed.\nDo not invent unsupported columns.\nDo not emit fields that are not present in the document unless they are obvious defaults.\nWhen a property id is needed and the document is clearly about the seeded property, use 'LIE-001'.\nUse ISO dates and datetimes where possible.\nUse exact table names from the schema.\n\nSCHEMA:\nproperties(property_id [VARCHAR PK REQUIRED], name [VARCHAR REQUIRED], street [VARCHAR REQUIRED], postal_code [VARCHAR REQUIRED], city [VARCHAR REQUIRED], country [VARCHAR REQUIRED], built_year [INTEGER NULLABLE], renovated_year [INTEGER NULLABLE], manager_name [VARCHAR NULLABLE], manager_street [VARCHAR NULLABLE], manager_postal_code [VARCHAR NULLABLE], manager_city [VARCHAR NULLABLE], manager_email [VARCHAR NULLABLE], manager_phone [VARCHAR NULLABLE], manager_iban [VARCHAR NULLABLE], manager_bic [VARCHAR NULLABLE], manager_bank [VARCHAR NULLABLE], manager_tax_number [VARCHAR NULLABLE], weg_account_iban [VARCHAR NULLABLE], weg_account_bic [VARCHAR NULLABLE], weg_account_bank [VARCHAR NULLABLE], reserve_account_iban [VARCHAR NULLABLE], reserve_account_bic [VARCHAR NULLABLE])\nbuildings(building_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], house_number [VARCHAR REQUIRED], units_count [INTEGER NULLABLE], floors [INTEGER NULLABLE], has_elevator [BOOLEAN REQUIRED], built_year [INTEGER NULLABLE])\nunits(unit_id [VARCHAR PK REQUIRED], building_id [VARCHAR REQUIRED FK->buildings.building_id], property_id [VARCHAR REQUIRED FK->properties.property_id], owner_id [VARCHAR NULLABLE FK->owners.owner_id], unit_number [VARCHAR REQUIRED], location [VARCHAR NULLABLE], type [VARCHAR REQUIRED], area_sqm [FLOAT NULLABLE], rooms [FLOAT NULLABLE], ownership_share [INTEGER NULLABLE])\nowners(owner_id [VARCHAR PK REQUIRED], salutation [VARCHAR NULLABLE], first_name [VARCHAR NULLABLE], last_name [VARCHAR NULLABLE], company [VARCHAR NULLABLE], street [VARCHAR NULLABLE], postal_code [VARCHAR NULLABLE], city [VARCHAR NULLABLE], country [VARCHAR REQUIRED], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], is_self_user [BOOLEAN REQUIRED], has_sev_mandate [BOOLEAN REQUIRED], is_council_member [BOOLEAN REQUIRED], language [VARCHAR REQUIRED])\ntenants(tenant_id [VARCHAR PK REQUIRED], salutation [VARCHAR NULLABLE], first_name [VARCHAR NULLABLE], last_name [VARCHAR NULLABLE], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], unit_id [VARCHAR NULLABLE FK->units.unit_id], landlord_owner_id [VARCHAR NULLABLE FK->owners.owner_id], lease_start [DATE NULLABLE], lease_end [DATE NULLABLE], cold_rent [FLOAT NULLABLE], utility_advance [FLOAT NULLABLE], deposit [FLOAT NULLABLE], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], language [VARCHAR REQUIRED])\nservice_providers(provider_id [VARCHAR PK REQUIRED], company [VARCHAR REQUIRED], branch [VARCHAR NULLABLE], contact_person [VARCHAR NULLABLE], email [VARCHAR NULLABLE], phone [VARCHAR NULLABLE], street [VARCHAR NULLABLE], postal_code [VARCHAR NULLABLE], city [VARCHAR NULLABLE], country [VARCHAR REQUIRED], iban [VARCHAR NULLABLE], bic [VARCHAR NULLABLE], vat_id [VARCHAR NULLABLE], tax_number [VARCHAR NULLABLE], style [VARCHAR NULLABLE], language [VARCHAR REQUIRED], monthly_contract [FLOAT NULLABLE], hourly_rate [FLOAT NULLABLE])\nbank_transactions(transaction_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], booking_date [DATE REQUIRED], direction [VARCHAR REQUIRED], amount [FLOAT REQUIRED], category [VARCHAR NULLABLE], counterparty_name [VARCHAR NULLABLE], purpose [VARCHAR NULLABLE], reference_id [VARCHAR NULLABLE], error_types [VARCHAR NULLABLE])\ninvoices(invoice_id [VARCHAR PK REQUIRED], invoice_number [VARCHAR NULLABLE], invoice_date [DATE REQUIRED], provider_id [VARCHAR NULLABLE FK->service_providers.provider_id], provider_company [VARCHAR NULLABLE], recipient [VARCHAR NULLABLE], property_id [VARCHAR NULLABLE FK->properties.property_id], net_amount [FLOAT NULLABLE], vat_amount [FLOAT NULLABLE], gross_amount [FLOAT NULLABLE], iban [VARCHAR NULLABLE], paid_transaction_id [VARCHAR NULLABLE FK->bank_transactions.transaction_id], source_event_id [VARCHAR NULLABLE FK->source_events.event_id], error_types [VARCHAR NULLABLE])\nsource_events(event_id [VARCHAR PK REQUIRED], source_type [VARCHAR REQUIRED], property_id [VARCHAR NULLABLE FK->properties.property_id], source_path [VARCHAR NULLABLE], received_at [DATETIME NULLABLE], thread_id [VARCHAR NULLABLE], direction [VARCHAR NULLABLE], from_address [VARCHAR NULLABLE], to_address [VARCHAR NULLABLE], subject [VARCHAR NULLABLE], category [VARCHAR NULLABLE], language [VARCHAR NULLABLE], raw_content [VARCHAR NULLABLE], error_types [VARCHAR NULLABLE])\nfacts(fact_id [VARCHAR PK REQUIRED], property_id [VARCHAR REQUIRED FK->properties.property_id], entity_type [VARCHAR REQUIRED], entity_id [VARCHAR REQUIRED], category [VARCHAR REQUIRED], statement [VARCHAR REQUIRED], source_event_id [VARCHAR NULLABLE FK->source_events.event_id], extracted_at [DATETIME REQUIRED], superseded_by [VARCHAR NULLABLE FK->facts.fact_id], status [VARCHAR REQUIRED], confidence [FLOAT NULLABLE])\n\nJSON SCHEMA:\n{\"$defs\": {\"ExtractOperation\": {\"properties\": {\"table\": {\"enum\": [\"properties\", \"buildings\", \"units\", \"owners\", \"tenants\", \"service_providers\", \"bank_transactions\", \"invoices\", \"source_events\", \"facts\"], \"title\": \"Table\", \"type\": \"string\"}, \"record\": {\"additionalProperties\": true, \"title\": \"Record\", \"type\": \"object\"}}, \"required\": [\"table\"], \"title\": \"ExtractOperation\", \"type\": \"object\"}}, \"properties\": {\"summary\": {\"default\": \"\", \"title\": \"Summary\", \"type\": \"string\"}, \"records\": {\"items\": {\"$ref\": \"#/$defs/ExtractOperation\"}, \"title\": \"Records\", \"type\": \"array\"}}, \"title\": \"DocumentExtraction\", \"type\": \"object\"}",
+  "user_prompt": "Document path: briefe/2024-12/20241205_mieterhoehung_LTR-0045.pdf\nDocument text:\n\"\"\"\nHuber & Partner Immobilienverwaltung GmbH\nFriedrichstrasse 112  .  10117 Berlin\nTel +49 30 12345-0  .  info@huber-partner-verwaltung.de\nHuber & Partner Immobilienverwaltung GmbH  .  Friedrichstrasse 112  .  10117 Berlin\nHerr Carsten Austermühle\nImmanuelkirchstraße 26\n10405 Berlin\nBerlin, 05.12.2024\nMieterhoehung nach §558 BGB - Wohnung WE 31\nSehr geehrte Damen und Herren,\ngemaess §558 BGB verlangen wir die Zustimmung zur Anhebung der Netto-Kaltmiete fuer Ihre Wohnung WE 31 auf den ortsueblichen Vergleichsmietwert.\nBisherige Nettokaltmiete: 1566.00 EUR\nNeue Nettokaltmiete:       1700.57 EUR\nErhoehung um:              134.57 EUR (8.6%)\nWirksam ab:                05.03.2025\nBitte bestaetigen Sie Ihre Zustimmung innerhalb der gesetzlichen Frist.\nMit freundlichen Gruessen\nHuber & Partner Immobilienverwaltung GmbH\nHuber & Partner Immobilienverwaltung GmbH  .  Steuernr 13/456/78901  .  Bank: Commerzbank Berlin  .  IBAN DE89  370 4 00 44 0 532  0130  00\n\n\"\"\"",
+  "raw_model_output": "{\n  \"summary\": \"Mieterhöhungsverlangen nach §558 BGB für Wohnung WE 31 vom 05.12.2024.\",\n  \"records\": [\n    {\n      \"table\": \"source_events\",\n      \"record\": {\n        \"event_id\": \"LTR-0045\",\n        \"source_type\": \"letter\",\n        \"property_id\": \"LIE-001\",\n        \"source_path\": \"briefe/2024-12/20241205_mieterhoehung_LTR-0045.pdf\",\n        \"direction\": \"outgoing\",\n        \"from_address\": \"info@huber-partner-verwaltung.de\",\n        \"subject\": \"Mieterhoehung nach §558 BGB - Wohnung WE 31\",\n        \"category\": \"rent_increase\",\n        \"language\": \"de\",\n        \"raw_content\": \"Huber & Partner Immobilienverwaltung GmbH\\nFriedrichstrasse 112  .  10117 Berlin\\nTel +49 30 12345-0  .  info@huber-partner-verwaltung.de\\nHuber & Partner Immobilienverwaltung GmbH  .  Friedrichstrasse 112  .  10117 Berlin\\nHerr Carsten Austermühle\\nImmanuelkirchstraße 26\\n10405 Berlin\\nBerlin, 05.12.2024\\nMieterhoehung nach §558 BGB - Wohnung WE 31\\nSehr geehrte Damen und Herren,\\ngemaess §558 BGB verlangen wir die Zustimmung zur Anhebung der Netto-Kaltmiete fuer Ihre Wohnung WE 31 auf den ortsueblichen Vergleichsmietwert.\\nBisherige Nettokaltmiete: 1566.00 EUR\\nNeue Nettokaltmiete:       1700.57 EUR\\nErhoehung um:              134.57 EUR (8.6%)\\nWirksam ab:                05.03.2025\\nBitte bestaetigen Sie Ihre Zustimmung innerhalb der gesetzlichen Frist.\\nMit freundlichen Gruessen\\nHuber & Partner Immobilienverwaltung GmbH\\nHuber & Partner Immobilienverwaltung GmbH  .  Steuernr 13/456/78901  .  Bank: Commerzbank Berlin  .  IBAN DE89  370 4 00 44 0 532  0130  00\"\n      }\n    },\n    {\n      \"table\": \"facts\",\n      \"record\": {\n        \"fact_id\": \"FACT-LTR-0045-001\",\n        \"property_id\": \"LIE-001\",\n        \"entity_type\": \"unit\",\n        \"entity_id\": \"WE 31\",\n        \"category\": \"rent_increase_request\",\n        \"statement\": \"Für Wohnung WE 31 wurde am 05.12.2024 gemäß §558 BGB die Zustimmung zur Anhebung der Netto-Kaltmiete auf den ortsüblichen Vergleichsmietwert verlangt.\",\n        \"source_event_id\": \"LTR-0045\",\n        \"extracted_at\": \"2026-04-25T00:00:00\",\n        \"status\": \"active\",\n        \"confidence\": 0.98\n      }\n    },\n    {\n      \"table\": \"facts\",\n      \"record\": {\n        \"fact_id\": \"FACT-LTR-0045-002\",\n        \"property_id\": \"LIE-001\",\n        \"entity_type\": \"unit\",\n        \"entity_id\": \"WE 31\",\n        \"category\": \"rent_amount\",\n        \"statement\": \"Die bisherige Nettokaltmiete für Wohnung WE 31 beträgt 1566.00 EUR.\",\n        \"source_event_id\": \"LTR-0045\",\n        \"extracted_at\": \"2026-04-25T00:00:00\",\n        \"status\": \"active\",\n        \"confidence\": 0.99\n      }\n    },\n    {\n      \"table\": \"facts\",\n      \"record\": {\n        \"fact_id\": \"FACT-LTR-0045-003\",\n        \"property_id\": \"LIE-001\",\n        \"entity_type\": \"unit\",\n        \"entity_id\": \"WE 31\",\n        \"category\": \"rent_amount\",\n        \"statement\": \"Die neue Nettokaltmiete für Wohnung WE 31 soll 1700.57 EUR betragen.\",\n        \"source_event_id\": \"LTR-0045\",\n        \"extracted_at\": \"2026-04-25T00:00:00\",\n        \"status\": \"active\",\n        \"confidence\": 0.99\n      }\n    },\n    {\n      \"table\": \"facts\",\n      \"record\": {\n        \"fact_id\": \"FACT-LTR-0045-004\",\n        \"property_id\": \"LIE-001\",\n        \"entity_type\": \"unit\",\n        \"entity_id\": \"WE 31\",\n        \"category\": \"rent_increase\",\n        \"statement\": \"Die verlangte Erhöhung der Nettokaltmiete für Wohnung WE 31 beträgt 134.57 EUR bzw. 8.6%.\",\n        \"source_event_id\": \"LTR-0045\",\n        \"extracted_at\": \"2026-04-25T00:00:00\",\n        \"status\": \"active\",\n        \"confidence\": 0.99\n      }\n    },\n    {\n      \"table\": \"facts\",\n      \"record\": {\n        \"fact_id\": \"FACT-LTR-0045-005\",\n        \"property_id\": \"LIE-001\",\n        \"entity_type\": \"unit\",\n        \"entity_id\": \"WE 31\",\n        \"category\": \"effective_date\",\n        \"statement\": \"Die Mieterhöhung für Wohnung WE 31 soll ab dem 05.03.2025 wirksam werden.\",\n        \"source_event_id\": \"LTR-0045\",\n        \"extracted_at\": \"2026-04-25T00:00:00\",\n        \"status\": \"active\",\n        \"confidence\": 0.99\n      }\n    },\n    {\n      \"table\": \"facts\",\n      \"record\": {\n        \"fact_id\": \"FACT-LTR-0045-006\",\n        \"property_id\": \"LIE-001\",\n        \"entity_type\": \"tenant\",\n        \"entity_id\": \"Carsten Austermühle\",\n        \"category\": \"correspondence_recipient\",\n        \"statement\": \"Das Mieterhöhungsverlangen für Wohnung WE 31 ist an Herrn Carsten Austermühle, Immanuelkirchstraße 26, 10405 Berlin, adressiert.\",\n        \"source_event_id\": \"LTR-0045\",\n        \"extracted_at\": \"2026-04-25T00:00:00\",\n        \"status\": \"active\",\n        \"confidence\": 0.96\n      }\n    }\n  ]\n}",
+  "validated_output": {
+    "summary": "Mieterhöhungsverlangen nach §558 BGB für Wohnung WE 31 vom 05.12.2024.",
+    "records": [
+      {
+        "table": "source_events",
+        "record": {
+          "event_id": "LTR-0045",
+          "source_type": "letter",
+          "property_id": "LIE-001",
+          "source_path": "briefe/2024-12/20241205_mieterhoehung_LTR-0045.pdf",
+          "direction": "outgoing",
+          "from_address": "info@huber-partner-verwaltung.de",
+          "subject": "Mieterhoehung nach §558 BGB - Wohnung WE 31",
+          "category": "rent_increase",
+          "language": "de",
+          "raw_content": "Huber & Partner Immobilienverwaltung GmbH\nFriedrichstrasse 112  .  10117 Berlin\nTel +49 30 12345-0  .  info@huber-partner-verwaltung.de\nHuber & Partner Immobilienverwaltung GmbH  .  Friedrichstrasse 112  .  10117 Berlin\nHerr Carsten Austermühle\nImmanuelkirchstraße 26\n10405 Berlin\nBerlin, 05.12.2024\nMieterhoehung nach §558 BGB - Wohnung WE 31\nSehr geehrte Damen und Herren,\ngemaess §558 BGB verlangen wir die Zustimmung zur Anhebung der Netto-Kaltmiete fuer Ihre Wohnung WE 31 auf den ortsueblichen Vergleichsmietwert.\nBisherige Nettokaltmiete: 1566.00 EUR\nNeue Nettokaltmiete:       1700.57 EUR\nErhoehung um:              134.57 EUR (8.6%)\nWirksam ab:                05.03.2025\nBitte bestaetigen Sie Ihre Zustimmung innerhalb der gesetzlichen Frist.\nMit freundlichen Gruessen\nHuber & Partner Immobilienverwaltung GmbH\nHuber & Partner Immobilienverwaltung GmbH  .  Steuernr 13/456/78901  .  Bank: Commerzbank Berlin  .  IBAN DE89  370 4 00 44 0 532  0130  00"
+        }
+      },
+      {
+        "table": "facts",
+        "record": {
+          "fact_id": "FACT-LTR-0045-001",
+          "property_id": "LIE-001",
+          "entity_type": "unit",
+          "entity_id": "WE 31",
+          "category": "rent_increase_request",
+          "statement": "Für Wohnung WE 31 wurde am 05.12.2024 gemäß §558 BGB die Zustimmung zur Anhebung der Netto-Kaltmiete auf den ortsüblichen Vergleichsmietwert verlangt.",
+          "source_event_id": "LTR-0045",
+          "extracted_at": "2026-04-25T00:00:00",
+          "status": "active",
+          "confidence": 0.98
+        }
+      },
+      {
+        "table": "facts",
+        "record": {
+          "fact_id": "FACT-LTR-0045-002",
+          "property_id": "LIE-001",
+          "entity_type": "unit",
+          "entity_id": "WE 31",
+          "category": "rent_amount",
+          "statement": "Die bisherige Nettokaltmiete für Wohnung WE 31 beträgt 1566.00 EUR.",
+          "source_event_id": "LTR-0045",
+          "extracted_at": "2026-04-25T00:00:00",
+          "status": "active",
+          "confidence": 0.99
+        }
+      },
+      {
+        "table": "facts",
+        "record": {
+          "fact_id": "FACT-LTR-0045-003",
+          "property_id": "LIE-001",
+          "entity_type": "unit",
+          "entity_id": "WE 31",
+          "category": "rent_amount",
+          "statement": "Die neue Nettokaltmiete für Wohnung WE 31 soll 1700.57 EUR betragen.",
+          "source_event_id": "LTR-0045",
+          "extracted_at": "2026-04-25T00:00:00",
+          "status": "active",
+          "confidence": 0.99
+        }
+      },
+      {
+        "table": "facts",
+        "record": {
+          "fact_id": "FACT-LTR-0045-004",
+          "property_id": "LIE-001",
+          "entity_type": "unit",
+          "entity_id": "WE 31",
+          "category": "rent_increase",
+          "statement": "Die verlangte Erhöhung der Nettokaltmiete für Wohnung WE 31 beträgt 134.57 EUR bzw. 8.6%.",
+          "source_event_id": "LTR-0045",
+          "extracted_at": "2026-04-25T00:00:00",
+          "status": "active",
+          "confidence": 0.99
+        }
+      },
+      {
+        "table": "facts",
+        "record": {
+          "fact_id": "FACT-LTR-0045-005",
+          "property_id": "LIE-001",
+          "entity_type": "unit",
+          "entity_id": "WE 31",
+          "category": "effective_date",
+          "statement": "Die Mieterhöhung für Wohnung WE 31 soll ab dem 05.03.2025 wirksam werden.",
+          "source_event_id": "LTR-0045",
+          "extracted_at": "2026-04-25T00:00:00",
+          "status": "active",
+          "confidence": 0.99
+        }
+      },
+      {
+        "table": "facts",
+        "record": {
+          "fact_id": "FACT-LTR-0045-006",
+          "property_id": "LIE-001",
+          "entity_type": "tenant",
+          "entity_id": "Carsten Austermühle",
+          "category": "correspondence_recipient",
+          "statement": "Das Mieterhöhungsverlangen für Wohnung WE 31 ist an Herrn Carsten Austermühle, Immanuelkirchstraße 26, 10405 Berlin, adressiert.",
+          "source_event_id": "LTR-0045",
+          "extracted_at": "2026-04-25T00:00:00",
+          "status": "active",
+          "confidence": 0.96
+        }
+      }
+    ]
+  },
+  "parse_error": null
+}
